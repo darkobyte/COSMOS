@@ -9,8 +9,8 @@ services:
       # ── Required ──────────────────────────────────────────────────────────────
       
       # SERVER_URL: WebSocket URL of the cosmos server (REQUIRED)
-      # ws://dev.gianluca.click:3001
-      SERVER_URL: ws://dev.gianluca.click:3001
+      # ws://cosmos.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       
       # PLANET_ID: Unique identifier for this celestial body (REQUIRED)
       # Must be a string with no spaces

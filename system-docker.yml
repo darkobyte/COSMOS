@@ -2,7 +2,7 @@ services:
   morris:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: morris
       PLANET_NAME: Morris
       PLANET_TYPE: planet
@@ -18,7 +18,7 @@ services:
   phillipino:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: phillipino
       PLANET_NAME: Phillippines
       PLANET_TYPE: planet
@@ -34,7 +34,7 @@ services:
   halley:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: halley
       PLANET_NAME: Halley
       PLANET_TYPE: planet
@@ -52,7 +52,7 @@ services:
   sun:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: sun
       PLANET_NAME: Sun
       PLANET_TYPE: star
@@ -68,7 +68,7 @@ services:
   # mercury:
   #   image: darkobyte/cosmos_planet
   #   environment:
-  #     SERVER_URL: ws://dev.gianluca.click:3001
+  #     SERVER_URL: ws://cosmos.gianluca.click:3001
   #     PLANET_ID: mercury
   #     PLANET_NAME: Mercury
   #     PLANET_TYPE: planet
@@ -84,7 +84,7 @@ services:
   # venus:
   #   image: darkobyte/cosmos_planet
   #   environment:
-  #     SERVER_URL: ws://dev.gianluca.click:3001
+  #     SERVER_URL: ws://cosmos.gianluca.click:3001
   #     PLANET_ID: venus
   #     PLANET_NAME: Venus
   #     PLANET_TYPE: planet
@@ -100,7 +100,7 @@ services:
   # earth:
   #   image: darkobyte/cosmos_planet
   #   environment:
-  #     SERVER_URL: ws://dev.gianluca.click:3001
+  #     SERVER_URL: ws://cosmos.gianluca.click:3001
   #     PLANET_ID: earth
   #     PLANET_NAME: Earth
   #     PLANET_TYPE: planet
@@ -116,7 +116,7 @@ services:
   # mars:
   #   image: darkobyte/cosmos_planet
   #   environment:
-  #     SERVER_URL: ws://dev.gianluca.click:3001
+  #     SERVER_URL: ws://cosmos.gianluca.click:3001
   #     PLANET_ID: mars
   #     PLANET_NAME: Mars
   #     PLANET_TYPE: planet
@@ -132,7 +132,7 @@ services:
   # jupiter:
   #   image: darkobyte/cosmos_planet
   #   environment:
-  #     SERVER_URL: ws://dev.gianluca.click:3001
+  #     SERVER_URL: ws://cosmos.gianluca.click:3001
   #     PLANET_ID: jupiter
   #     PLANET_NAME: Jupiter
   #     PLANET_TYPE: planet
@@ -148,7 +148,7 @@ services:
   # saturn:
   #   image: darkobyte/cosmos_planet
   #   environment:
-  #     SERVER_URL: ws://dev.gianluca.click:3001
+  #     SERVER_URL: ws://cosmos.gianluca.click:3001
   #     PLANET_ID: saturn
   #     PLANET_NAME: Saturn
   #     PLANET_TYPE: planet
@@ -164,7 +164,7 @@ services:
   # uranus:
   #   image: darkobyte/cosmos_planet
   #   environment:
-  #     SERVER_URL: ws://dev.gianluca.click:3001
+  #     SERVER_URL: ws://cosmos.gianluca.click:3001
   #     PLANET_ID: uranus
   #     PLANET_NAME: Uranus
   #     PLANET_TYPE: planet
@@ -180,7 +180,7 @@ services:
   # neptune:
   #   image: darkobyte/cosmos_planet
   #   environment:
-  #     SERVER_URL: ws://dev.gianluca.click:3001
+  #     SERVER_URL: ws://cosmos.gianluca.click:3001
   #     PLANET_ID: neptune
   #     PLANET_NAME: Neptune
   #     PLANET_TYPE: planet

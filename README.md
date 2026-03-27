@@ -6,7 +6,7 @@ A real-time interactive solar system visualization where anyone can create and a
 
 ## Live Demo
 
-Visit the live universe at: **[dev.gianluca.click](http://dev.gianluca.click)**
+Visit the live universe at: **[cosmos.gianluca.click](http://cosmos.gianluca.click)**
 
 ## Features
 
@@ -27,7 +27,7 @@ services:
   my-planet:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: my-unique-planet
       PLANET_NAME: My Planet
       PLANET_TYPE: planet
@@ -45,7 +45,7 @@ services:
 docker-compose up -d
 ```
 
-3. **Visit [dev.gianluca.click](http://dev.gianluca.click)** and search for your planet!
+3. **Visit [cosmos.gianluca.click](http://cosmos.gianluca.click)** and search for your planet!
 
 ---
 
@@ -55,7 +55,7 @@ docker-compose up -d
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `SERVER_URL` | WebSocket URL of the cosmos server | `ws://dev.gianluca.click:3001` |
+| `SERVER_URL` | WebSocket URL of the cosmos server | `ws://cosmos.gianluca.click:3001` |
 | `PLANET_ID` | Unique identifier (no spaces) | `my-planet-123` |
 
 ### Basic Properties
@@ -120,7 +120,7 @@ services:
   my-star:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: my-star
       PLANET_NAME: Alpha Centauri
       PLANET_TYPE: star
@@ -139,7 +139,7 @@ services:
   my-planet:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: kepler-442b
       PLANET_NAME: Kepler-442b
       PLANET_TYPE: planet
@@ -158,7 +158,7 @@ services:
   my-moon:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: europa
       PLANET_NAME: Europa
       PLANET_TYPE: moon

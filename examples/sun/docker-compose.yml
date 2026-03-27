@@ -2,7 +2,7 @@ services:
   sun:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: sun
       PLANET_NAME: COSMOS X
       PLANET_TYPE: star

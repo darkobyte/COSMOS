@@ -1,5 +1,5 @@
 # Change DOMAIN here to use a different domain
-x-domain: &domain ${DOMAIN:-dev.gianluca.click}
+x-domain: &domain ${DOMAIN:-cosmos.gianluca.click}
 
 services:
   cosmos-server:
@@ -10,7 +10,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-dev.gianluca.click}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-cosmos.gianluca.click}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=leresolver"
@@ -27,14 +27,14 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_WS_URL: wss://${DOMAIN:-dev.gianluca.click}/api
+        VITE_WS_URL: wss://${DOMAIN:-cosmos.gianluca.click}/api
     ports:
       - "8081:80"
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-dev.gianluca.click}`)"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-cosmos.gianluca.click}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.routers.frontend.tls.certresolver=leresolver"
@@ -46,7 +46,7 @@ services:
   cosmos_x:
     image: darkobyte/cosmos_planet
     environment:
-      SERVER_URL: ws://dev.gianluca.click:3001
+      SERVER_URL: ws://cosmos.gianluca.click:3001
       PLANET_ID: cosmos_x
       PLANET_NAME: COSMOS X
       PLANET_TYPE: star

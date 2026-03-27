@@ -352,7 +352,7 @@ function updateBody(bodyData) {
 
 // ─── WebSocket ──────────────────────────────────────────────────────────────
 
-const WS_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_WS_URL) || 'ws://dev.gianluca.click:3001'
+const WS_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_WS_URL) || 'ws://cosmos.gianluca.click:3001'
 let ws = null
 let wsRetryTimer = null
 let wsRetryDelay = 3000
