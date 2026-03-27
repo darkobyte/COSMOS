@@ -1,0 +1,15 @@
+services:
+  moon:
+    image: darkobyte/cosmos_planet
+    environment:
+      SERVER_URL: ws://dev.gianluca.click:3001
+      PLANET_ID: moon
+      PLANET_NAME: Mond
+      PLANET_TYPE: moon
+      PLANET_PARENT: earth
+      PLANET_RADIUS: "30"
+      PLANET_SPEED: "0.04"
+      PLANET_ELEMENTS: rock,iron
+      PLANET_INFO: "Einziger natürlicher Satellit der Erde."
+      PLANET_SIZE: "1"
+    restart: unless-stopped

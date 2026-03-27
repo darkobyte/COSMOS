@@ -1,0 +1,66 @@
+# Change DOMAIN here to use a different domain
+x-domain: &domain ${DOMAIN:-dev.gianluca.click}
+
+services:
+  cosmos-server:
+    build: ./server
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-dev.gianluca.click}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=leresolver"
+      - "traefik.http.routers.backend.priority=10"
+      - "traefik.http.middlewares.strip-api.stripprefix.prefixes=/api"
+      - "traefik.http.routers.backend.middlewares=strip-api@docker"
+      - "traefik.http.services.backend.loadbalancer.server.port=3001"
+      - "traefik.http.services.backend.loadbalancer.server.scheme=http"
+    networks:
+      - cosmos
+      - traefik
+
+  cosmos-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_WS_URL: wss://${DOMAIN:-dev.gianluca.click}/api
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-dev.gianluca.click}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=leresolver"
+      - "traefik.http.routers.frontend.priority=1"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    networks:
+      - cosmos
+      - traefik
+  cosmos_x:
+    image: darkobyte/cosmos_planet
+    environment:
+      SERVER_URL: ws://dev.gianluca.click:3001
+      PLANET_ID: cosmos_x
+      PLANET_NAME: COSMOS X
+      PLANET_TYPE: star
+      PLANET_PARENT: "none"
+      PLANET_RADIUS: "0"
+      PLANET_SPEED: "0"
+      PLANET_ELEMENTS: dark_matter,fire
+      PLANET_INFO: "The central star of our solar system. An unusual mixture of dark matter and fire."
+      PLANET_SIZE: "4"
+    restart: unless-stopped
+
+networks:
+  cosmos:
+    name: cosmos
+    driver: bridge
+  traefik:
+    external: true
