@@ -57,8 +57,8 @@ const nextSyncCountdown = computed(() => {
 })
 
 const nextSyncLabel = computed(() => {
-  if (!syncInfo.nextSyncAtMs && !syncInfo.rateLimitResetAtMs) return 'NEXT:--'
-  return syncInfo.rateLimited ? `NEXT(RL):${nextSyncCountdown.value}` : `NEXT:${nextSyncCountdown.value}`
+  if (!syncInfo.nextSyncAtMs && !syncInfo.rateLimitResetAtMs) return 'NEXT UPDATE:--'
+  return syncInfo.rateLimited ? `NEXT UPDATE (RL):${nextSyncCountdown.value}` : `NEXT UPDATE:${nextSyncCountdown.value}`
 })
 
 // New UI features state

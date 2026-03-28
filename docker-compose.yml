@@ -8,7 +8,7 @@ services:
       - "3001:3001"
     environment:
       GITHUB_REPO: darkobyte/COSMOS
-      SYNC_INTERVAL: "10000"
+      SYNC_INTERVAL: "300000"
       DEV_MODE: "false"  # Set to "true" to disable GitHub sync (for testing)
       DEV_POPULATE_COUNT: "50"  # Number of fake planets to generate in dev mode
     restart: unless-stopped
