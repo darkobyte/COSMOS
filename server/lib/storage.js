@@ -2,6 +2,15 @@ const fs = require('fs');
 const path = require('path');
 
 const STORAGE_FILE = path.join(__dirname, '..', 'data', 'stargazers.json');
+const SYSTEMS_FILE = path.join(__dirname, '..', 'data', 'systems.json');
+
+function ensureStorageDir() {
+  try {
+    fs.mkdirSync(path.dirname(STORAGE_FILE), { recursive: true });
+  } catch (err) {
+    console.error('  [Storage] Failed to ensure data directory:', err.message);
+  }
+}
 
 /**
  * Load stargazers from JSON file
@@ -11,7 +20,8 @@ function loadStargazers() {
     if (!fs.existsSync(STORAGE_FILE)) {
       return {
         last_synced: null,
-        stargazers: []
+        stargazers: [],
+        systems: null
       };
     }
     
@@ -21,7 +31,8 @@ function loadStargazers() {
     console.error('  [Storage] Failed to load stargazers.json:', err.message);
     return {
       last_synced: null,
-      stargazers: []
+      stargazers: [],
+      systems: null
     };
   }
 }
@@ -31,14 +42,16 @@ function loadStargazers() {
  */
 function saveStargazers(data) {
   try {
+    ensureStorageDir();
+
     const tmpFile = STORAGE_FILE + '.tmp';
-    
+
     // Write to temp file first
     fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), 'utf8');
-    
+
     // Atomic rename
     fs.renameSync(tmpFile, STORAGE_FILE);
-    
+
     console.log(`  [Storage] Saved ${data.stargazers.length} stargazers to disk`);
   } catch (err) {
     console.error('  [Storage] Failed to save stargazers.json:', err.message);

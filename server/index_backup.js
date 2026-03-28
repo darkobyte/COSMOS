@@ -1,31 +1,8 @@
-/**
- * COSMOS//SERVER v3.0 - Multi-Solar System Architecture
- * 
- * Architecture Overview:
- * - COSMOS X: Central star at the origin
- * - Sol: Our real solar system (protected, orbits COSMOS X at fixed radius ~300)
- * - Generated Solar Systems: GitHub users form mini solar systems with generated suns
- * - Black Holes: Randomly spawned (5% chance per 10 users)
- * 
- * User Assignment:
- * - Each GitHub stargazer is assigned to a solar system
- * - First ~5 users per system become planets orbiting the system's sun
- * - Additional users have 30% chance to become moons orbiting existing planets
- * - Systems are created dynamically as needed
- * 
- * Orbital Hierarchy:
- * - Generated Suns → orbit COSMOS X (radius 400-2500, avoiding Sol's protected zone)
- * - Planets → orbit their system's sun (radius 40-250)
- * - Moons → orbit planets (radius 20-80)
- * - Black Holes → orbit COSMOS X (radius 600-2800)
- */
-
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const GitHubClient = require('./lib/github');
 const { generatePlanet } = require('./lib/planetGenerator');
-const SolarSystemManager = require('./lib/solarSystemManager');
-const OrbitalAllocatorV2 = require('./lib/orbitalAllocator_v2');
+const OrbitalAllocator = require('./lib/orbitalAllocator');
 const { loadStargazers, saveStargazers, addStargazer, removeStargazer } = require('./lib/storage');
 
 // ─── Config ─────────────────────────────────────────────────────────────────
@@ -40,10 +17,9 @@ const DEV_POPULATE_COUNT = parseInt(process.env.DEV_POPULATE_COUNT) || 50; // Nu
 
 const bodies = new Map();   // id -> { body: {...}, ws: null }
 const viewers = new Set();  // browser connections
-let stargazersData = { last_synced: null, stargazers: [], systems: null }; // Added systems to storage
+let stargazersData = { last_synced: null, stargazers: [] };
 
 const githubClient = new GitHubClient(GITHUB_REPO);
-const solarSystemManager = new SolarSystemManager();
 
 const syncState = {
   lastAttemptAtMs: null,
@@ -75,7 +51,6 @@ function broadcastStats() {
     type: 'stats',
     viewers: viewers.size,
     bodies: bodies.size,
-    systems: solarSystemManager.systems.size,
     sync: getSyncStats(),
   });
 }
@@ -127,7 +102,10 @@ function createSolarSystem() {
 
   console.log('  [🌟] Initializing real Solar System...');
 
-  // Create the Sun (Sol) - orbits COSMOS X at a protected fixed distance
+  // Create the Sun (Sol) - orbits COSMOS X
+  const allocator = new OrbitalAllocator(bodies);
+  const sunOrbit = allocator.calculateSafeRadius('cosmos_x', 3, 'sol');
+  
   const sun = {
     id: 'sol',
     name: 'Sol',
@@ -135,7 +113,7 @@ function createSolarSystem() {
     size: 3,
     elements: ['fire', 'gas'],
     orbit_parent_id: 'cosmos_x',
-    orbit_radius: 300,
+    orbit_radius: 400,
     orbit_speed: 0.0008,
     orbit_angle_start: Math.random() * Math.PI * 2,
     registered_at: Date.now(),
@@ -260,96 +238,9 @@ function createSolarSystem() {
   console.log(`  [🌙] Added ${moonCount} moons to solar system`);
 }
 
-// ─── System Body Creators ───────────────────────────────────────────────────
+// ─── GitHub Sync ────────────────────────────────────────────────────────────
 
-/**
- * Create a generated sun body for a solar system
- */
-function createSystemSun(sunData, orbit) {
-  return {
-    id: sunData.id,
-    name: sunData.name,
-    type: sunData.type,
-    size: sunData.size,
-    elements: sunData.elements,
-    colors: sunData.colors,
-    orbit_parent_id: orbit.orbit_parent_id,
-    orbit_radius: orbit.orbit_radius,
-    orbit_speed: orbit.orbit_speed,
-    orbit_angle_start: orbit.orbit_angle_start,
-    registered_at: sunData.registered_at,
-    info: sunData.info,
-    system_id: sunData.system_id
-  };
-}
-
-/**
- * Create a planet body from a GitHub user
- */
-function createPlanetBody(stargazer, planet, orbit) {
-  return {
-    id: planet.id,
-    name: planet.name,
-    type: 'planet',
-    size: planet.size,
-    elements: planet.elements,
-    colors: planet.colors,
-    orbit_parent_id: orbit.orbit_parent_id,
-    orbit_radius: orbit.orbit_radius,
-    orbit_speed: orbit.orbit_speed,
-    orbit_angle_start: orbit.orbit_angle_start,
-    registered_at: Date.now(),
-    info: planet.info,
-    github_url: planet.github_url,
-    avatar_url: planet.avatar_url
-  };
-}
-
-/**
- * Create a moon body from a GitHub user
- */
-function createMoonBody(stargazer, planet, orbit) {
-  return {
-    id: planet.id,
-    name: planet.name,
-    type: 'moon',
-    size: planet.size,
-    elements: planet.elements,
-    colors: planet.colors,
-    orbit_parent_id: orbit.orbit_parent_id,
-    orbit_radius: orbit.orbit_radius,
-    orbit_speed: orbit.orbit_speed,
-    orbit_angle_start: orbit.orbit_angle_start,
-    registered_at: Date.now(),
-    info: planet.info,
-    github_url: planet.github_url,
-    avatar_url: planet.avatar_url
-  };
-}
-
-/**
- * Create a black hole body
- */
-function createBlackHole(blackHoleData, orbit) {
-  return {
-    id: blackHoleData.id,
-    name: blackHoleData.name,
-    type: blackHoleData.type,
-    size: blackHoleData.size,
-    elements: blackHoleData.elements,
-    colors: blackHoleData.colors,
-    orbit_parent_id: orbit.orbit_parent_id,
-    orbit_radius: orbit.orbit_radius,
-    orbit_speed: orbit.orbit_speed,
-    orbit_angle_start: orbit.orbit_angle_start,
-    registered_at: blackHoleData.registered_at,
-    info: blackHoleData.info
-  };
-}
-
-// ─── GitHub Sync V2 (Multi-Solar System) ───────────────────────────────────
-
-async function syncGitHubStarsV2() {
+async function syncGitHubStars() {
   if (DEV_MODE) return;
 
   const now = Date.now();
@@ -391,25 +282,28 @@ async function syncGitHubStarsV2() {
     // Find removed stars (unstars)
     for (const stored of stargazersData.stargazers) {
       if (!currentGitHubIds.has(stored.github_id)) {
-        await handleUserUnstar(stored);
+        const planetId = stored.planet.id;
+
+        // Remove planet
+        if (bodies.has(planetId)) {
+          bodies.delete(planetId);
+          broadcastToViewers({ type: 'body_removed', id: planetId });
+          console.log(`  [-] Removed planet: ${planetId} (user unstarred)`);
+        }
+
+        // Remove from storage
+        removeStargazer(stargazersData, stored.github_id);
       }
     }
 
     // Find new stars
     for (const stargazer of stargazers) {
       if (!storedGitHubIds.has(stargazer.id)) {
-        await handleUserStar(stargazer);
+        await addNewPlanet(stargazer);
       }
     }
 
-    // Check for black hole spawning
-    if (solarSystemManager.shouldSpawnBlackHole(stargazersData.stargazers.length)) {
-      await spawnBlackHole();
-    }
-
-    // Save state
     stargazersData.last_synced = new Date().toISOString();
-    stargazersData.systems = solarSystemManager.exportState();
     saveStargazers(stargazersData);
 
     syncState.lastError = null;
@@ -428,47 +322,32 @@ async function syncGitHubStarsV2() {
   }
 }
 
-/**
- * Handle a new user starring the repo
- */
-async function handleUserStar(stargazer) {
+async function addNewPlanet(stargazer) {
   try {
     // Generate planet config
     const planet = generatePlanet(stargazer);
     
-    // Assign user to a solar system
-    const assignment = solarSystemManager.assignUserToSystem(stargazer.id, planet);
-    const system = solarSystemManager.getSystemForUser(stargazer.id);
+    // Allocate orbit
+    const allocator = new OrbitalAllocator(bodies);
+    const orbit = allocator.allocateOrbit(planet);
     
-    const allocator = new OrbitalAllocatorV2(bodies);
-
-    // If this is a new system, create and add the sun
-    if (!bodies.has(system.sun.id)) {
-      const sunOrbit = allocator.allocateSunOrbit();
-      const sunBody = createSystemSun(system.sun, sunOrbit);
-      bodies.set(sunBody.id, { body: sunBody, ws: null });
-      broadcastToViewers({ type: 'body_added', body: getBodySnapshot({ body: sunBody, ws: null }) });
-      console.log(`  [☀️] New sun: ${sunBody.id} (${sunBody.name}) at radius ${sunOrbit.orbit_radius.toFixed(0)}`);
-    }
-
-    let body;
-    if (assignment.isMoon) {
-      // Create as moon orbiting a planet
-      const parentPlanetUserId = system.moons.find(m => m.userId === stargazer.id).parentPlanetId;
-      const parentPlanetRecord = stargazersData.stargazers.find(s => s.github_id === parentPlanetUserId);
-      const parentPlanetId = parentPlanetRecord.planet.id;
-      
-      const moonOrbit = allocator.allocateMoonOrbit(parentPlanetId, planet.size);
-      body = createMoonBody(stargazer, planet, moonOrbit);
-      
-      console.log(`  [🌙] New moon: ${body.id} (${body.name}) orbiting ${parentPlanetId}`);
-    } else {
-      // Create as planet orbiting the sun
-      const planetOrbit = allocator.allocatePlanetOrbit(system.sun.id, planet.size);
-      body = createPlanetBody(stargazer, planet, planetOrbit);
-      
-      console.log(`  [🪐] New planet: ${body.id} (${body.name}) in system ${assignment.systemId}`);
-    }
+    // Create full body
+    const body = {
+      id: planet.id,
+      name: planet.name,
+      type: planet.type,
+      size: planet.size,
+      elements: planet.elements,
+      orbit_parent_id: orbit.orbit_parent_id,
+      orbit_radius: orbit.orbit_radius,
+      orbit_speed: orbit.orbit_speed,
+      orbit_angle_start: Math.random() * Math.PI * 2,
+      registered_at: Date.now(),
+      info: planet.info,
+      github_url: planet.github_url,
+      avatar_url: planet.avatar_url,
+      colors: planet.colors
+    };
 
     // Add to bodies
     bodies.set(body.id, { body, ws: null });
@@ -480,136 +359,34 @@ async function handleUserStar(stargazer) {
       avatar_url: stargazer.avatar_url,
       profile_url: stargazer.html_url,
       starred_at: new Date().toISOString(),
-      planet: body,
-      system_id: assignment.systemId,
-      is_moon: assignment.isMoon
+      planet: body
     };
     addStargazer(stargazersData, stargazerRecord);
 
     // Broadcast to viewers
     broadcastToViewers({ type: 'body_added', body: getBodySnapshot({ body, ws: null }) });
     
+    console.log(`  [+] New planet: ${body.id} (${body.name}) parent=${orbit.orbit_parent_id}`);
+    
   } catch (err) {
     console.error(`  [!] Failed to add planet for ${stargazer.login}:`, err.message);
   }
 }
 
-/**
- * Handle a user unstarring the repo
- */
-async function handleUserUnstar(stored) {
-  try {
-    const planetId = stored.planet.id;
-
-    // Remove from solar system manager
-    const result = solarSystemManager.removeUserFromSystem(stored.github_id);
-
-    // Remove user's body
-    if (bodies.has(planetId)) {
-      bodies.delete(planetId);
-      broadcastToViewers({ type: 'body_removed', id: planetId });
-      console.log(`  [-] Removed ${stored.is_moon ? 'moon' : 'planet'}: ${planetId} (user unstarred)`);
-    }
-
-    // If this was a planet with moons, remove all its moons
-    if (!stored.is_moon) {
-      const moonsToRemove = stargazersData.stargazers.filter(s => 
-        s.is_moon && s.planet.orbit_parent_id === planetId
-      );
-      
-      for (const moon of moonsToRemove) {
-        if (bodies.has(moon.planet.id)) {
-          bodies.delete(moon.planet.id);
-          broadcastToViewers({ type: 'body_removed', id: moon.planet.id });
-          console.log(`  [-] Removed moon: ${moon.planet.id} (parent planet removed)`);
-        }
-        removeStargazer(stargazersData, moon.github_id);
-      }
-    }
-
-    // If system was removed (empty), remove the sun
-    if (result && result.systemRemoved) {
-      const sunId = `sun_${result.systemId}`;
-      if (bodies.has(sunId)) {
-        bodies.delete(sunId);
-        broadcastToViewers({ type: 'body_removed', id: sunId });
-        console.log(`  [☀️] Removed sun: ${sunId} (system empty)`);
-      }
-    }
-
-    // Remove from storage
-    removeStargazer(stargazersData, stored.github_id);
-    
-  } catch (err) {
-    console.error(`  [!] Failed to remove user ${stored.github_id}:`, err.message);
-  }
-}
-
-/**
- * Spawn a black hole
- */
-async function spawnBlackHole() {
-  try {
-    const blackHoleData = solarSystemManager.generateBlackHole();
-    const allocator = new OrbitalAllocatorV2(bodies);
-    const orbit = allocator.allocateBlackHoleOrbit();
-    
-    const blackHole = createBlackHole(blackHoleData, orbit);
-    bodies.set(blackHole.id, { body: blackHole, ws: null });
-    
-    broadcastToViewers({ type: 'body_added', body: getBodySnapshot({ body: blackHole, ws: null }) });
-    console.log(`  [🕳️] Black hole spawned: ${blackHole.id} at radius ${orbit.orbit_radius.toFixed(0)}`);
-    
-  } catch (err) {
-    console.error(`  [!] Failed to spawn black hole:`, err.message);
-  }
-}
-
 // ─── Restore from Storage ───────────────────────────────────────────────────
 
-/**
- * Initialize solar systems from storage
- */
-function initializeSolarSystems() {
-  console.log('\n  [Systems] Initializing solar systems...');
+function restorePlanetsFromStorage() {
+  console.log('\n  [Storage] Restoring planets from disk...');
   
-  // Load stargazers data
   stargazersData = loadStargazers();
   
-  // Restore solar system manager state
-  if (stargazersData.systems) {
-    solarSystemManager.importState(stargazersData.systems);
-    console.log(`  [Systems] Restored ${solarSystemManager.systems.size} solar systems`);
-  }
-  
-  // Restore all bodies from stargazers
-  const allocator = new OrbitalAllocatorV2(bodies);
-  
-  // First, create all suns
-  const systems = solarSystemManager.getAllSystems();
-  for (const system of systems) {
-    if (!bodies.has(system.sun.id)) {
-      const sunOrbit = allocator.allocateSunOrbit();
-      const sunBody = createSystemSun(system.sun, sunOrbit);
-      bodies.set(sunBody.id, { body: sunBody, ws: null });
-      console.log(`  [☀️] Restored sun: ${sunBody.id} (${sunBody.name})`);
-    }
-  }
-  
-  // Then, create all planets and moons
   for (const record of stargazersData.stargazers) {
     const body = record.planet;
     bodies.set(body.id, { body, ws: null });
-    
-    const emoji = body.type === 'moon' ? '🌙' : '🪐';
-    console.log(`  [${emoji}] Restored ${body.type}: ${body.id} (${body.name})`);
+    console.log(`  [↻] Restored: ${body.id} (${body.name})`);
   }
   
-  // Restore black holes (they're stored in bodies but not in stargazers)
-  const bodyEntries = Array.from(bodies.values());
-  const blackHoles = bodyEntries.filter(entry => entry.body.type === 'blackhole');
-  
-  console.log(`  [Storage] Restored ${stargazersData.stargazers.length} user bodies, ${systems.length} suns, ${blackHoles.length} black holes`);
+  console.log(`  [Storage] Restored ${stargazersData.stargazers.length} planets`);
 }
 
 // ─── Dev Mode Auto-Populate ─────────────────────────────────────────────────
@@ -647,14 +424,10 @@ async function devAutoPopulate() {
     const exists = stargazersData.stargazers.find(s => s.github_id === fakeStargazer.id);
     if (exists) continue;
 
-    await handleUserStar(fakeStargazer);
+    await addNewPlanet(fakeStargazer);
   }
 
-  // Save after populating
-  stargazersData.systems = solarSystemManager.exportState();
-  saveStargazers(stargazersData);
-
-  console.log(`  [DEV] Auto-populate complete! ${stargazersData.stargazers.length} total planets in ${solarSystemManager.systems.size} systems\n`);
+  console.log(`  [DEV] Auto-populate complete! ${stargazersData.stargazers.length} total planets\n`);
 }
 
 // ─── WebSocket Server ───────────────────────────────────────────────────────
@@ -721,14 +494,14 @@ wss.on('connection', (ws) => {
 // ─── Startup ────────────────────────────────────────────────────────────────
 
 async function startup() {
-  console.log('╔═══════════════════════════════════════╗');
-  console.log('║   COSMOS//SERVER v3.0 (Multi-Solar)  ║');
-  console.log(`║   Port: ${PORT}                         ║`);
-  console.log(`║   Repo: ${GITHUB_REPO}      ║`);
+  console.log('╔══════════════════════════════════╗');
+  console.log('║   COSMOS//SERVER v2.0 (GitHub)   ║');
+  console.log(`║   Port: ${PORT}                    ║`);
+  console.log(`║   Repo: ${GITHUB_REPO}   ║`);
   if (DEV_MODE) {
-    console.log('║   Mode: DEV (No GitHub Sync)          ║');
+    console.log('║   Mode: DEV (No GitHub Sync)     ║');
   }
-  console.log('╚═══════════════════════════════════════╝');
+  console.log('╚══════════════════════════════════╝');
   console.log('');
 
   // Create COSMOS X
@@ -737,8 +510,8 @@ async function startup() {
   // Create our real Solar System (hidden easter egg)
   createSolarSystem();
 
-  // Initialize solar systems and restore from storage
-  initializeSolarSystems();
+  // Restore planets from storage
+  restorePlanetsFromStorage();
 
   // Dev mode auto-populate
   if (DEV_MODE) {
@@ -747,10 +520,10 @@ async function startup() {
 
   if (!DEV_MODE) {
     // Initial sync
-    await syncGitHubStarsV2();
+    await syncGitHubStars();
 
     // Start periodic sync
-    setInterval(syncGitHubStarsV2, SYNC_INTERVAL);
+    setInterval(syncGitHubStars, SYNC_INTERVAL);
     console.log(`\n  [GitHub] Sync interval: ${SYNC_INTERVAL / 1000}s`);
   } else {
     console.log('  [DEV] GitHub sync disabled');
@@ -758,9 +531,7 @@ async function startup() {
 
   // Start server
   server.listen(PORT, () => {
-    console.log(`\n  [✓] Server ready on port ${PORT}`);
-    console.log(`  [✓] Solar Systems: ${solarSystemManager.systems.size}`);
-    console.log(`  [✓] Total Bodies: ${bodies.size}\n`);
+    console.log(`\n  [✓] Server ready on port ${PORT}\n`);
   });
 }
 
