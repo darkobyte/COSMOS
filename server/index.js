@@ -21,6 +21,40 @@ let stargazersData = { last_synced: null, stargazers: [] };
 
 const githubClient = new GitHubClient(GITHUB_REPO);
 
+const syncState = {
+  lastAttemptAtMs: null,
+  nextSyncAtMs: null,
+  rateLimited: false,
+  rateLimitResetAtMs: null,
+  lastError: null,
+};
+
+function toIso(ms) {
+  return ms ? new Date(ms).toISOString() : null;
+}
+
+function getSyncStats() {
+  return {
+    interval_ms: SYNC_INTERVAL,
+    last_attempt: toIso(syncState.lastAttemptAtMs),
+    last_success: stargazersData.last_synced,
+    next_sync: toIso(syncState.nextSyncAtMs),
+    rate_limited: syncState.rateLimited,
+    rate_limit_reset: toIso(syncState.rateLimitResetAtMs),
+    last_error: syncState.lastError,
+    dev_mode: DEV_MODE,
+  };
+}
+
+function broadcastStats() {
+  broadcastToViewers({
+    type: 'stats',
+    viewers: viewers.size,
+    bodies: bodies.size,
+    sync: getSyncStats(),
+  });
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function broadcastToViewers(msg) {
@@ -63,13 +97,37 @@ function createCosmosX() {
 // ─── GitHub Sync ────────────────────────────────────────────────────────────
 
 async function syncGitHubStars() {
+  if (DEV_MODE) return;
+
+  const now = Date.now();
+
+  // If currently rate-limited, don't attempt again until GitHub says it's safe.
+  if (syncState.rateLimitResetAtMs && now < syncState.rateLimitResetAtMs) {
+    syncState.rateLimited = true;
+    syncState.nextSyncAtMs = syncState.rateLimitResetAtMs;
+    syncState.lastError = 'Rate limit exceeded';
+    broadcastStats();
+    return;
+  }
+
+  // Clear old rate-limit window once we're past it.
+  if (syncState.rateLimitResetAtMs && now >= syncState.rateLimitResetAtMs) {
+    syncState.rateLimitResetAtMs = null;
+    syncState.rateLimited = false;
+  }
+
+  syncState.lastAttemptAtMs = now;
+  syncState.nextSyncAtMs = now + SYNC_INTERVAL;
+
   try {
     console.log('\n  [GitHub] Syncing stargazers...');
-    
+
     const stargazers = await githubClient.fetchStargazers();
-    
+
     if (stargazers === null) {
-      // No changes (304)
+      // No changes (304) — still a successful sync attempt.
+      syncState.lastError = null;
+      broadcastStats();
       return;
     }
 
@@ -81,14 +139,14 @@ async function syncGitHubStars() {
     for (const stored of stargazersData.stargazers) {
       if (!currentGitHubIds.has(stored.github_id)) {
         const planetId = stored.planet.id;
-        
+
         // Remove planet
         if (bodies.has(planetId)) {
           bodies.delete(planetId);
           broadcastToViewers({ type: 'body_removed', id: planetId });
           console.log(`  [-] Removed planet: ${planetId} (user unstarred)`);
         }
-        
+
         // Remove from storage
         removeStargazer(stargazersData, stored.github_id);
       }
@@ -103,9 +161,20 @@ async function syncGitHubStars() {
 
     stargazersData.last_synced = new Date().toISOString();
     saveStargazers(stargazersData);
-    
+
+    syncState.lastError = null;
+    broadcastStats();
+
   } catch (err) {
-    console.error('  [GitHub] Sync failed:', err.message);
+    if (err && err.code === 'RATE_LIMIT' && err.resetAtMs) {
+      syncState.rateLimited = true;
+      syncState.rateLimitResetAtMs = err.resetAtMs;
+      syncState.nextSyncAtMs = err.resetAtMs;
+    }
+
+    syncState.lastError = (err && err.message) ? err.message : 'Sync failed';
+    console.error('  [GitHub] Sync failed:', syncState.lastError);
+    broadcastStats();
   }
 }
 
@@ -222,11 +291,12 @@ async function devAutoPopulate() {
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      status: 'ok', 
-      bodies: bodies.size, 
+    res.end(JSON.stringify({
+      status: 'ok',
+      bodies: bodies.size,
       viewers: viewers.size,
-      last_sync: stargazersData.last_synced 
+      last_sync: stargazersData.last_synced,
+      sync: getSyncStats(),
     }));
     return;
   }
@@ -253,6 +323,7 @@ wss.on('connection', (ws) => {
       }
       send(ws, { type: 'init', bodies: snapshot });
       console.log(`  [V] Viewer connected. Total: ${viewers.size}`);
+      broadcastStats();
       return;
     }
 
@@ -267,6 +338,7 @@ wss.on('connection', (ws) => {
     if (role === 'viewer') {
       viewers.delete(ws);
       console.log(`  [V] Viewer disconnected. Total: ${viewers.size}`);
+      broadcastStats();
     }
   });
 

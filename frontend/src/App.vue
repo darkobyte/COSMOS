@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 
 const canvas = ref(null)
 const fps = ref(0)
@@ -17,6 +17,49 @@ const panStart = reactive({ x: 0, y: 0 })
 
 const wsConnected = ref(false)
 const wsStatus = ref('CONNECTING')
+
+// Server stats (viewers + sync timing)
+const viewerCount = ref(null)
+const syncInfo = reactive({
+  intervalMs: null,
+  nextSyncAtMs: null,
+  rateLimited: false,
+  rateLimitResetAtMs: null,
+  lastError: null,
+})
+
+const nowMs = ref(Date.now())
+let nowTimer = null
+
+function parseIsoMs(iso) {
+  if (!iso) return null
+  const ms = Date.parse(iso)
+  return Number.isFinite(ms) ? ms : null
+}
+
+function formatDuration(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+  return `${m}:${String(ss).padStart(2, '0')}`
+}
+
+const viewerCountDisplay = computed(() => (viewerCount.value == null ? '--' : viewerCount.value))
+
+const nextSyncCountdown = computed(() => {
+  const targetMs = (syncInfo.rateLimited && syncInfo.rateLimitResetAtMs)
+    ? syncInfo.rateLimitResetAtMs
+    : syncInfo.nextSyncAtMs
+  if (!targetMs) return '--'
+  return formatDuration(targetMs - nowMs.value)
+})
+
+const nextSyncLabel = computed(() => {
+  if (!syncInfo.nextSyncAtMs && !syncInfo.rateLimitResetAtMs) return 'NEXT:--'
+  return syncInfo.rateLimited ? `NEXT(RL):${nextSyncCountdown.value}` : `NEXT:${nextSyncCountdown.value}`
+})
 
 // New UI features state
 const searchQuery = ref('')
@@ -383,11 +426,26 @@ function initWS() {
     if (msg.type === 'body_offline') setBodyOnline(msg.id, false)
     if (msg.type === 'body_online') setBodyOnline(msg.id, true)
     if (msg.type === 'body_updated') updateBody(msg.body)
+
+    if (msg.type === 'stats') {
+      if (typeof msg.viewers === 'number') viewerCount.value = msg.viewers
+      if (msg.sync) {
+        if (typeof msg.sync.interval_ms === 'number') syncInfo.intervalMs = msg.sync.interval_ms
+        syncInfo.rateLimited = !!msg.sync.rate_limited
+        syncInfo.nextSyncAtMs = parseIsoMs(msg.sync.next_sync)
+        syncInfo.rateLimitResetAtMs = parseIsoMs(msg.sync.rate_limit_reset)
+        syncInfo.lastError = msg.sync.last_error || null
+      }
+    }
   }
 
   ws.onclose = () => {
     wsConnected.value = false
     wsStatus.value = 'DISCONNECTED'
+    viewerCount.value = null
+    syncInfo.nextSyncAtMs = null
+    syncInfo.rateLimited = false
+    syncInfo.rateLimitResetAtMs = null
     wsRetryDelay = Math.min(wsRetryDelay * 1.5, 30000)
     wsRetryTimer = setTimeout(initWS, wsRetryDelay)
   }
@@ -727,6 +785,10 @@ function getBodyColor(body) {
 }
 
 onMounted(() => {
+  nowTimer = setInterval(() => {
+    nowMs.value = Date.now()
+  }, 250)
+
   resizeCanvas()
   window.addEventListener('resize', resizeCanvas)
   initWS()
@@ -734,6 +796,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer)
   if (animFrameId) cancelAnimationFrame(animFrameId)
   window.removeEventListener('resize', resizeCanvas)
   if (ws) ws.close()
@@ -745,6 +808,12 @@ onUnmounted(() => {
   <div class="cosmos-root" @mousemove="handleTopHover">
     <div class="scanlines" />
     <div class="vignette" />
+
+    <!-- Bottom-right floating HUD stats (no box) -->
+    <div class="corner-stats" aria-hidden="true">
+      <div class="corner-line">VIEWERS:{{ viewerCountDisplay }}</div>
+      <div :class="['corner-line', 'corner-next', { 'rate-limited': syncInfo.rateLimited }]">{{ nextSyncLabel }}</div>
+    </div>
 
     <!-- Toggle Statusbar Button -->
     <button 
@@ -759,7 +828,7 @@ onUnmounted(() => {
     <!-- Statusbar (Collapsible) -->
     <Transition name="statusbar-slide">
       <div v-if="statusbarExpanded" class="statusbar">
-        <span class="statusbar-title">COSMOS v1.0</span>
+        <span class="statusbar-title">COSMOS</span>
         <span class="sep">|</span>
         
         <!-- Search Input -->
@@ -1112,6 +1181,28 @@ html, body {
 .ws-status { font-size: 12px; letter-spacing: 0.06em; }
 .ws-on { color: #00ff41; }
 .ws-off { color: #ff1744; text-shadow: 0 0 6px #ff174488; }
+
+.corner-stats {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  z-index: 12;
+  pointer-events: none;
+  text-align: right;
+  color: #00ff41;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 8px #00ff4188;
+}
+
+.corner-line {
+  line-height: 1.25;
+}
+
+.corner-next.rate-limited {
+  color: #ff1744;
+  text-shadow: 0 0 6px #ff174488;
+}
 
 .offline-badge {
   color: #ff1744;

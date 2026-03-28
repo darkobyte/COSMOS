@@ -36,12 +36,22 @@ class GitHubClient {
           return;
         }
 
-        // Handle rate limit
+        // Handle rate limit (or other 403)
         if (res.statusCode === 403) {
+          const remaining = res.headers['x-ratelimit-remaining'];
           const resetTime = res.headers['x-ratelimit-reset'];
-          const resetDate = new Date(resetTime * 1000);
-          console.error(`  [GitHub] Rate limit exceeded. Resets at: ${resetDate}`);
-          reject(new Error('Rate limit exceeded'));
+
+          if (resetTime && remaining === '0') {
+            const resetDate = new Date(parseInt(resetTime, 10) * 1000);
+            console.error(`  [GitHub] Rate limit exceeded. Resets at: ${resetDate}`);
+            const err = new Error('Rate limit exceeded');
+            err.code = 'RATE_LIMIT';
+            err.resetAtMs = parseInt(resetTime, 10) * 1000;
+            reject(err);
+            return;
+          }
+
+          reject(new Error('GitHub API forbidden (403)'));
           return;
         }
 
