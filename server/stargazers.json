@@ -1,0 +1,35 @@
+{
+  "last_synced": "2026-03-28T07:56:10.038Z",
+  "stargazers": [
+    {
+      "github_id": 127387966,
+      "username": "darkobyte",
+      "avatar_url": "https://avatars.githubusercontent.com/u/127387966?v=4",
+      "profile_url": "https://github.com/darkobyte",
+      "starred_at": "2026-03-28T07:56:10.037Z",
+      "planet": {
+        "id": "github_darkobyte",
+        "name": "darkobyte",
+        "type": "planet",
+        "size": 1,
+        "elements": [
+          "gold",
+          "gas"
+        ],
+        "orbit_parent_id": "cosmos_x",
+        "orbit_radius": 146.56154743066173,
+        "orbit_speed": 0.0033682382477601973,
+        "orbit_angle_start": 0.14537575231216865,
+        "registered_at": 1774684570037,
+        "info": "Created by @darkobyte",
+        "github_url": "https://github.com/darkobyte",
+        "avatar_url": "https://avatars.githubusercontent.com/u/127387966?v=4",
+        "colors": [
+          "hsl(279, 70%, 60%)",
+          "hsl(153, 80%, 50%)",
+          "hsl(27, 60%, 55%)"
+        ]
+      }
+    }
+  ]
+}

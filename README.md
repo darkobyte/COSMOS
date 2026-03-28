@@ -1,6 +1,6 @@
 # COSMOS Universe
 
-A real-time interactive solar system visualization where anyone can create and add their own planets, moons, and stars!
+A real-time interactive solar system visualization powered by **GitHub Stars**! ⭐
 
 ![COSMOS](https://img.shields.io/badge/COSMOS-Universe-00ff41?style=for-the-badge)
 
@@ -8,180 +8,54 @@ A real-time interactive solar system visualization where anyone can create and a
 
 Visit the live universe at: **[cosmos.gianluca.click](http://cosmos.gianluca.click)**
 
+## ⭐ How It Works
+
+**Every GitHub star creates a planet!** Simply star this repository and watch your planet appear in the universe:
+
+1. **Star this repository** ⭐
+2. Your planet is automatically created and added to the cosmos
+3. **Visit [cosmos.gianluca.click](http://cosmos.gianluca.click)** to see your planet orbiting!
+
+### Your Planet's Features
+- **Unique appearance** - Generated from your GitHub profile colors
+- **Size based on followers** - More followers = bigger planet!
+- **Smart orbital mechanics** - Automatically assigned to avoid collisions
+- **Profile integration** - Click your planet to see your GitHub profile
+- **Persistent** - Your planet stays as long as you keep the star ⭐
+
+### What Happens When You Unstar?
+Your planet will be removed from the universe within 5 minutes (next sync cycle).
+
+---
+
 ## Features
 
 - **Real-time visualization** - Watch planets orbit in real-time with smooth animations
-- **Create your own planets** - Deploy a Docker container and see your planet appear instantly
+- **GitHub-powered** - Every star creates a unique planet automatically
 - **Interactive controls** - Pan, zoom, and click on planets for details
-- **Search functionality** - Find any planet by name
+- **Search functionality** - Find any planet by GitHub username
 - **Space radio** - Listen to ambient space music while exploring
-
-## Create Your Own Planet
-
-### Quick Start
-
-1. **Create a `docker-compose.yml` file:**
-
-```yaml
-services:
-  my-planet:
-    image: darkobyte/cosmos_planet
-    environment:
-      SERVER_URL: ws://cosmos.gianluca.click:3001
-      PLANET_ID: my-unique-planet
-      PLANET_NAME: My Planet
-      PLANET_TYPE: planet
-      PLANET_SIZE: "2"
-      PLANET_ELEMENTS: water,rock
-      PLANET_PARENT: sun
-      PLANET_RADIUS: "200"
-      PLANET_SPEED: "0.006"
-      PLANET_INFO: "My awesome custom planet!"
-    restart: unless-stopped
-```
-
-2. **Run it:**
-```bash
-docker-compose up -d
-```
-
-3. **Visit [cosmos.gianluca.click](http://cosmos.gianluca.click)** and search for your planet!
+- **Smart collisions** - Planets are intelligently distributed to prevent overlaps
 
 ---
 
-## Configuration Reference
+## Planet Types & Rarity
 
-### Required Variables
+Your planet type is randomly assigned based on your username:
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `SERVER_URL` | WebSocket URL of the cosmos server | `ws://cosmos.gianluca.click:3001` |
-| `PLANET_ID` | Unique identifier (no spaces) | `my-planet-123` |
+| Type | Rarity | Description |
+|------|--------|-------------|
+| 🪐 Planet | 70% | Standard orbiting planet |
+| 🌙 Moon | 15% | Smaller satellite body |
+| ☄️ Asteroid | 5% | Rocky, irregular body |
+| 🕳️ Black Hole | 1% | Ultra-rare cosmic phenomenon |
 
-### Basic Properties
-
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `PLANET_NAME` | Display name | Same as ID | `My Planet` |
-| `PLANET_TYPE` | Type of body | `planet` | `star`, `planet`, `moon`, `asteroid`, `blackhole` |
-| `PLANET_SIZE` | Visual size (1-4) | `2` | `1`=small, `2`=medium, `3`=large, `4`=huge |
-| `PLANET_INFO` | Description text | empty | `A beautiful blue planet` |
-
-### Composition
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PLANET_ELEMENTS` | Comma-separated elements | `rock` |
-
-**Available Elements:**
-| Element | Color | Best For |
-|---------|-------|----------|
-| `water` | Cyan/Blue | Ocean planets, ice giants |
-| `iron` | Red | Mars-like, rocky planets |
-| `rock` | Gray | Moons, asteroids |
-| `gas` | Yellow | Gas giants |
-| `ice` | Light Blue | Ice worlds, comets |
-| `fire` | Orange | Stars, volcanic worlds |
-| `nitrogen` | Purple | Titan-like moons |
-| `gold` | Gold | Special/rare bodies |
-| `dark_matter` | Purple/Dark | Exotic stars, black holes |
-
-**Tip:** Combine multiple elements for unique looks: `water,iron,rock` creates an Earth-like appearance!
-
-### Orbital Mechanics
-
-For orbiting bodies (planets around stars, moons around planets):
-
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `PLANET_PARENT` | ID of parent body to orbit | `none` | `sun`, `earth`, `jupiter` |
-| `PLANET_RADIUS` | Orbital distance in pixels | `150` | `100`-`500` |
-| `PLANET_SPEED` | Orbital speed | `0.005` | `0.002`=slow, `0.01`=fast |
-
-### Fixed Position
-
-For stationary bodies (stars, central objects):
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `PLANET_PARENT` | Must be `none` | `none` |
-| `PLANET_FIXED_X` | X position in pixels | `0`, `150`, `-200` |
-| `PLANET_FIXED_Y` | Y position in pixels | `0`, `100`, `-150` |
-
-**Note:** Fixed bodies must be at least 60px apart from each other.
-
----
-
-## Examples
-
-### Create a Star
-```yaml
-services:
-  my-star:
-    image: darkobyte/cosmos_planet
-    environment:
-      SERVER_URL: ws://cosmos.gianluca.click:3001
-      PLANET_ID: my-star
-      PLANET_NAME: Alpha Centauri
-      PLANET_TYPE: star
-      PLANET_SIZE: "4"
-      PLANET_ELEMENTS: fire,gold
-      PLANET_PARENT: "none"
-      PLANET_FIXED_X: "-300"
-      PLANET_FIXED_Y: "200"
-      PLANET_INFO: "A distant star system"
-    restart: unless-stopped
-```
-
-### Create an Orbiting Planet
-```yaml
-services:
-  my-planet:
-    image: darkobyte/cosmos_planet
-    environment:
-      SERVER_URL: ws://cosmos.gianluca.click:3001
-      PLANET_ID: kepler-442b
-      PLANET_NAME: Kepler-442b
-      PLANET_TYPE: planet
-      PLANET_SIZE: "2"
-      PLANET_ELEMENTS: water,rock,ice
-      PLANET_PARENT: sun
-      PLANET_RADIUS: "250"
-      PLANET_SPEED: "0.004"
-      PLANET_INFO: "A potentially habitable exoplanet"
-    restart: unless-stopped
-```
-
-### Create a Moon
-```yaml
-services:
-  my-moon:
-    image: darkobyte/cosmos_planet
-    environment:
-      SERVER_URL: ws://cosmos.gianluca.click:3001
-      PLANET_ID: europa
-      PLANET_NAME: Europa
-      PLANET_TYPE: moon
-      PLANET_SIZE: "1"
-      PLANET_ELEMENTS: ice,water
-      PLANET_PARENT: earth
-      PLANET_RADIUS: "40"
-      PLANET_SPEED: "0.03"
-      PLANET_INFO: "An icy moon with a subsurface ocean"
-    restart: unless-stopped
-```
-
----
-
-## Controls
-
-| Action | Control |
-|--------|---------|
-| Pan | Click and drag |
-| Zoom | Mouse scroll wheel |
-| Select planet | Click on planet |
-| Search | Type in search bar, press Enter |
-| Toggle statusbar | Click arrow button |
+### Planet Size
+Based on your GitHub followers:
+- 1-9 followers: Size 1 (small)
+- 10-99 followers: Size 2 (medium)
+- 100-999 followers: Size 3 (large)
+- 1000+ followers: Size 4 (huge)
 
 ---
 
@@ -197,7 +71,14 @@ docker-compose up -d
 
 This starts:
 - **Frontend** - Vue.js visualization (port 80)
-- **Server** - WebSocket server (port 3001)
+- **Server** - WebSocket server with GitHub integration (port 3001)
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GITHUB_REPO` | GitHub repository to track | `darkobyte/COSMOS` |
+| `SYNC_INTERVAL` | Sync interval in milliseconds | `300000` (5 minutes) |
 
 ---
 
@@ -205,16 +86,66 @@ This starts:
 
 ```
 universe/
-├── frontend/          # Vue.js frontend application
-├── server/            # WebSocket server
-├── planet-client/     # Planet client Docker image
-├── examples/          # Example planet configurations
-│   ├── earth/
-│   ├── mars/
-│   ├── moon/
-│   └── sun/
-└── docker-compose.yml # Main deployment
+├── frontend/              # Vue.js frontend application
+├── server/                # WebSocket server with GitHub API
+│   ├── lib/
+│   │   ├── github.js      # GitHub API client
+│   │   ├── planetGenerator.js  # Planet generation logic
+│   │   ├── orbitalAllocator.js # Smart orbit distribution
+│   │   └── storage.js     # JSON persistence
+│   └── stargazers.json    # Persistent planet data
+└── docker-compose.yml     # Main deployment
 ```
+
+---
+
+## How It Works Technically
+
+1. **Server polls GitHub API** every 5 minutes for stargazers
+2. **New stars** trigger automatic planet creation with:
+   - Username-based colors and attributes
+   - Smart orbital allocation to avoid collisions
+   - Profile data integration
+3. **Planets persist** in `stargazers.json` across server restarts
+4. **Unstars are detected** and planets removed automatically
+5. **WebSocket broadcasts** keep all viewers in sync in real-time
+
+### Orbital System
+- **COSMOS X** (central star) can have unlimited direct children
+- Other planets can have max 10 satellites
+- Planets distributed in rings to prevent collisions
+- When primary orbits fill, planets become satellites of other planets
+
+---
+
+## API
+
+The server exposes a health check endpoint:
+
+```bash
+GET /health
+
+Response:
+{
+  "status": "ok",
+  "bodies": 42,
+  "viewers": 5,
+  "last_sync": "2026-03-28T07:56:10.038Z"
+}
+```
+
+---
+
+## Controls
+
+| Action | Control |
+|--------|---------|
+| Pan | Click and drag |
+| Zoom | Mouse scroll wheel |
+| Select planet | Click on planet |
+| View GitHub profile | Click "View Profile" in planet info |
+| Search | Type username in search bar |
+| Toggle statusbar | Click arrow button |
 
 ---
 
@@ -234,4 +165,4 @@ MIT License - feel free to use and modify!
 
 ---
 
-Made by [DarkObyte](https://github.com/DarkObyte)
+Made with ❤️ by [DarkObyte](https://github.com/DarkObyte)

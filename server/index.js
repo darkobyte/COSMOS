@@ -1,274 +1,267 @@
-const http = require('http')
-const { WebSocketServer } = require('ws')
+const http = require('http');
+const { WebSocketServer } = require('ws');
+const GitHubClient = require('./lib/github');
+const { generatePlanet } = require('./lib/planetGenerator');
+const OrbitalAllocator = require('./lib/orbitalAllocator');
+const { loadStargazers, saveStargazers, addStargazer, removeStargazer } = require('./lib/storage');
 
-// ─── State ─────────────────────────────────────────────────────────────────
+// ─── Config ─────────────────────────────────────────────────────────────────
 
-const bodies = new Map()   // id -> { body: {...}, ws: WebSocket|null }
-const viewers = new Set()  // browser connections
+const PORT = process.env.PORT || 3001;
+const GITHUB_REPO = process.env.GITHUB_REPO || 'darkobyte/COSMOS';
+const SYNC_INTERVAL = parseInt(process.env.SYNC_INTERVAL) || 300000; // 5 minutes
 
-// ─── Validation ────────────────────────────────────────────────────────────
+// ─── State ──────────────────────────────────────────────────────────────────
 
-const VALID_TYPES = ['star', 'planet', 'moon', 'asteroid', 'blackhole']
-const VALID_ELEMENTS = ['water', 'iron', 'rock', 'gas', 'ice', 'fire', 'nitrogen', 'gold', 'dark_matter']
+const bodies = new Map();   // id -> { body: {...}, ws: null }
+const viewers = new Set();  // browser connections
+let stargazersData = { last_synced: null, stargazers: [] };
 
-function validateBody(body) {
-  if (!body.id || typeof body.id !== 'string' || body.id.includes(' ')) {
-    return 'id: required string with no spaces'
-  }
-  if (!body.name || typeof body.name !== 'string') {
-    return 'name: required string'
-  }
-  if (!VALID_TYPES.includes(body.type)) {
-    return `type: must be one of ${VALID_TYPES.join(', ')}`
-  }
-  if (!Array.isArray(body.elements) || body.elements.length === 0) {
-    return 'elements: non-empty array required'
-  }
-  for (const el of body.elements) {
-    if (!VALID_ELEMENTS.includes(el)) {
-      return `elements: "${el}" is not valid. Must be one of ${VALID_ELEMENTS.join(', ')}`
-    }
-  }
-  const size = body.size
-  if (!Number.isInteger(size) || size < 1 || size > 4) {
-    return 'size: integer between 1 and 4'
-  }
-  if (body.orbit_parent_id && body.orbit_parent_id !== 'none') {
-    if (typeof body.orbit_radius !== 'number' || body.orbit_radius <= 0) {
-      return 'orbit_radius: must be > 0 when orbit_parent_id is set'
-    }
-  }
-  if (typeof body.orbit_speed !== 'number' || body.orbit_speed < 0) {
-    return 'orbit_speed: must be >= 0'
-  }
-  return null
-}
+const githubClient = new GitHubClient(GITHUB_REPO);
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-function hasChildren(parentId) {
-  for (const [, entry] of bodies) {
-    if (entry.body.orbit_parent_id === parentId) return true
-  }
-  return false
-}
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function broadcastToViewers(msg) {
-  const data = JSON.stringify(msg)
+  const data = JSON.stringify(msg);
   for (const viewer of viewers) {
-    if (viewer.readyState === 1) viewer.send(data)
+    if (viewer.readyState === 1) viewer.send(data);
   }
 }
 
 function send(ws, msg) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg))
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
 }
 
 function getBodySnapshot(entry) {
-  return { ...entry.body, online: entry.ws !== null }
+  return { ...entry.body, online: true }; // GitHub planets are always "online"
 }
 
-function cleanupOrphanedOffline() {
-  let changed = false
-  for (const [id, entry] of bodies) {
-    if (entry.ws === null && !hasChildren(id)) {
-      bodies.delete(id)
-      broadcastToViewers({ type: 'body_removed', id })
-      console.log(`  [-] Orphan offline body removed: ${id}`)
-      changed = true
+// ─── COSMOS X (Central Star) ────────────────────────────────────────────────
+
+function createCosmosX() {
+  const cosmosX = {
+    id: 'cosmos_x',
+    name: 'COSMOS X',
+    type: 'star',
+    size: 4,
+    elements: ['dark_matter', 'fire'],
+    orbit_parent_id: null,
+    orbit_radius: 0,
+    orbit_speed: 0,
+    orbit_angle_start: 0,
+    registered_at: Date.now(),
+    info: 'The central star of our solar system. An unusual mixture of dark matter and fire.',
+    fixed_offset: { x: 0, y: 0 }
+  };
+
+  bodies.set('cosmos_x', { body: cosmosX, ws: null });
+  console.log('  [★] COSMOS X initialized at center');
+}
+
+// ─── GitHub Sync ────────────────────────────────────────────────────────────
+
+async function syncGitHubStars() {
+  try {
+    console.log('\n  [GitHub] Syncing stargazers...');
+    
+    const stargazers = await githubClient.fetchStargazers();
+    
+    if (stargazers === null) {
+      // No changes (304)
+      return;
     }
+
+    // Build set of current GitHub user IDs
+    const currentGitHubIds = new Set(stargazers.map(s => s.id));
+    const storedGitHubIds = new Set(stargazersData.stargazers.map(s => s.github_id));
+
+    // Find removed stars (unstars)
+    for (const stored of stargazersData.stargazers) {
+      if (!currentGitHubIds.has(stored.github_id)) {
+        const planetId = stored.planet.id;
+        
+        // Remove planet
+        if (bodies.has(planetId)) {
+          bodies.delete(planetId);
+          broadcastToViewers({ type: 'body_removed', id: planetId });
+          console.log(`  [-] Removed planet: ${planetId} (user unstarred)`);
+        }
+        
+        // Remove from storage
+        removeStargazer(stargazersData, stored.github_id);
+      }
+    }
+
+    // Find new stars
+    for (const stargazer of stargazers) {
+      if (!storedGitHubIds.has(stargazer.id)) {
+        await addNewPlanet(stargazer);
+      }
+    }
+
+    stargazersData.last_synced = new Date().toISOString();
+    saveStargazers(stargazersData);
+    
+  } catch (err) {
+    console.error('  [GitHub] Sync failed:', err.message);
   }
-  if (changed) cleanupOrphanedOffline()
+}
+
+async function addNewPlanet(stargazer) {
+  try {
+    // Generate planet config
+    const planet = generatePlanet(stargazer);
+    
+    // Allocate orbit
+    const allocator = new OrbitalAllocator(bodies);
+    const orbit = allocator.allocateOrbit(planet);
+    
+    // Create full body
+    const body = {
+      id: planet.id,
+      name: planet.name,
+      type: planet.type,
+      size: planet.size,
+      elements: planet.elements,
+      orbit_parent_id: orbit.orbit_parent_id,
+      orbit_radius: orbit.orbit_radius,
+      orbit_speed: orbit.orbit_speed,
+      orbit_angle_start: Math.random() * Math.PI * 2,
+      registered_at: Date.now(),
+      info: planet.info,
+      github_url: planet.github_url,
+      avatar_url: planet.avatar_url,
+      colors: planet.colors
+    };
+
+    // Add to bodies
+    bodies.set(body.id, { body, ws: null });
+
+    // Save to storage
+    const stargazerRecord = {
+      github_id: stargazer.id,
+      username: stargazer.login,
+      avatar_url: stargazer.avatar_url,
+      profile_url: stargazer.html_url,
+      starred_at: new Date().toISOString(),
+      planet: body
+    };
+    addStargazer(stargazersData, stargazerRecord);
+
+    // Broadcast to viewers
+    broadcastToViewers({ type: 'body_added', body: getBodySnapshot({ body, ws: null }) });
+    
+    console.log(`  [+] New planet: ${body.id} (${body.name}) parent=${orbit.orbit_parent_id}`);
+    
+  } catch (err) {
+    console.error(`  [!] Failed to add planet for ${stargazer.login}:`, err.message);
+  }
+}
+
+// ─── Restore from Storage ───────────────────────────────────────────────────
+
+function restorePlanetsFromStorage() {
+  console.log('\n  [Storage] Restoring planets from disk...');
+  
+  stargazersData = loadStargazers();
+  
+  for (const record of stargazersData.stargazers) {
+    const body = record.planet;
+    bodies.set(body.id, { body, ws: null });
+    console.log(`  [↻] Restored: ${body.id} (${body.name})`);
+  }
+  
+  console.log(`  [Storage] Restored ${stargazersData.stargazers.length} planets`);
 }
 
 // ─── WebSocket Server ───────────────────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ status: 'ok', bodies: bodies.size, viewers: viewers.size }))
-    return
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      bodies: bodies.size, 
+      viewers: viewers.size,
+      last_sync: stargazersData.last_synced 
+    }));
+    return;
   }
-  res.writeHead(404)
-  res.end()
-})
+  res.writeHead(404);
+  res.end();
+});
 
-const wss = new WebSocketServer({ server })
+const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
-  let role = null  // 'viewer' | 'planet'
-  let bodyId = null
+  let role = 'viewer';
 
   ws.on('message', (raw) => {
-    let msg
-    try { msg = JSON.parse(raw) } catch { return }
+    let msg;
+    try { msg = JSON.parse(raw); } catch { return; }
 
     // ── viewer identify ──
     if (msg.type === 'viewer') {
-      role = 'viewer'
-      viewers.add(ws)
-      const snapshot = []
+      role = 'viewer';
+      viewers.add(ws);
+      const snapshot = [];
       for (const [, entry] of bodies) {
-        snapshot.push(getBodySnapshot(entry))
+        snapshot.push(getBodySnapshot(entry));
       }
-      send(ws, { type: 'init', bodies: snapshot })
-      console.log(`  [V] Viewer connected. Total: ${viewers.size}`)
-      return
-    }
-
-    // ── planet register ──
-    if (msg.type === 'register') {
-      const body = msg.body
-      if (!body) { send(ws, { type: 'error', message: 'Missing body in register' }); return }
-
-      const validationError = validateBody(body)
-      if (validationError) {
-        send(ws, { type: 'error', message: validationError })
-        return
-      }
-
-      const id = body.id
-
-      // Check if ID already exists
-      if (bodies.has(id)) {
-        const existing = bodies.get(id)
-        if (existing.ws === null) {
-          // Offline reconnect - update body data fully
-          const orbitAngleStart = existing.body.orbit_angle_start
-          const registeredAt = existing.body.registered_at
-          
-          // Update body with new data but preserve orbit timing
-          const updatedBody = {
-            ...body,
-            orbit_parent_id: (!body.orbit_parent_id || body.orbit_parent_id === 'none') ? null : body.orbit_parent_id,
-            orbit_angle_start: orbitAngleStart,
-            registered_at: registeredAt
-          }
-          
-          existing.body = updatedBody
-          existing.ws = ws
-          role = 'planet'
-          bodyId = id
-          
-          send(ws, { type: 'registered', id, orbit_angle_start: orbitAngleStart, registered_at: registeredAt })
-          broadcastToViewers({ type: 'body_updated', body: getBodySnapshot(existing) })
-          console.log(`  [↑] Body reconnected & updated: ${id} (${body.name})`)
-          return
-        } else {
-          send(ws, { type: 'error', message: `ID "${id}" is already taken` })
-          return
-        }
-      }
-
-      // Check orbit_parent_id exists
-      const parentId = body.orbit_parent_id
-      if (parentId && parentId !== 'none') {
-        if (!bodies.has(parentId)) {
-          send(ws, { type: 'error', message: `orbit_parent_id "${parentId}" not found` })
-          return
-        }
-      }
-
-      // Orbit conflict check
-      if (parentId && parentId !== 'none') {
-        for (const [, entry] of bodies) {
-          const other = entry.body
-          if (other.orbit_parent_id === parentId) {
-            const rDiff = Math.abs(other.orbit_radius - body.orbit_radius)
-            const minGap = (other.size + body.size) * 7 + 15
-            if (rDiff < minGap) {
-              send(ws, { type: 'error', message: `Orbit conflict with "${other.id}": radii too close (diff ${rDiff.toFixed(1)} < ${minGap})` })
-              return
-            }
-          }
-        }
-      }
-
-      // Fixed offset conflict check (no parent)
-      if (!parentId || parentId === 'none') {
-        const fx = typeof body.fixed_offset?.x === 'number' ? body.fixed_offset.x : 0
-        const fy = typeof body.fixed_offset?.y === 'number' ? body.fixed_offset.y : 0
-        for (const [, entry] of bodies) {
-          const other = entry.body
-          if (!other.orbit_parent_id || other.orbit_parent_id === 'none') {
-            const ox = typeof other.fixed_offset?.x === 'number' ? other.fixed_offset.x : 0
-            const oy = typeof other.fixed_offset?.y === 'number' ? other.fixed_offset.y : 0
-            const dist = Math.sqrt((fx - ox) ** 2 + (fy - oy) ** 2)
-            if (dist < 60) {
-              send(ws, { type: 'error', message: `Fixed offset conflict with "${other.id}": too close (${dist.toFixed(1)}px < 60px)` })
-              return
-            }
-          }
-        }
-      }
-
-      // Assign random start angle and timestamp
-      const orbitAngleStart = Math.random() * Math.PI * 2
-      const registeredAt = Date.now()
-
-      const storedBody = {
-        ...body,
-        orbit_parent_id: (!parentId || parentId === 'none') ? null : parentId,
-        orbit_angle_start: orbitAngleStart,
-        registered_at: registeredAt
-      }
-
-      bodies.set(id, { body: storedBody, ws })
-      role = 'planet'
-      bodyId = id
-
-      send(ws, { type: 'registered', id, orbit_angle_start: orbitAngleStart, registered_at: registeredAt })
-      broadcastToViewers({ type: 'body_added', body: getBodySnapshot({ body: storedBody, ws }) })
-
-      console.log(`  [+] Body registered: ${id} (${body.name}) type=${body.type} parent=${storedBody.orbit_parent_id ?? 'none'}`)
-      return
+      send(ws, { type: 'init', bodies: snapshot });
+      console.log(`  [V] Viewer connected. Total: ${viewers.size}`);
+      return;
     }
 
     // ── heartbeat ──
     if (msg.type === 'heartbeat') {
-      send(ws, { type: 'pong' })
-      return
+      send(ws, { type: 'pong' });
+      return;
     }
-  })
+  });
 
   ws.on('close', () => {
     if (role === 'viewer') {
-      viewers.delete(ws)
-      console.log(`  [V] Viewer disconnected. Total: ${viewers.size}`)
-      return
+      viewers.delete(ws);
+      console.log(`  [V] Viewer disconnected. Total: ${viewers.size}`);
     }
-
-    if (role === 'planet' && bodyId) {
-      const entry = bodies.get(bodyId)
-      if (!entry) return
-
-      entry.ws = null
-
-      if (hasChildren(bodyId)) {
-        broadcastToViewers({ type: 'body_offline', id: bodyId })
-        console.log(`  [↓] Body offline (has children): ${bodyId}`)
-      } else {
-        bodies.delete(bodyId)
-        broadcastToViewers({ type: 'body_removed', id: bodyId })
-        console.log(`  [-] Body removed: ${bodyId}`)
-        cleanupOrphanedOffline()
-      }
-    }
-  })
+  });
 
   ws.on('error', (err) => {
-    console.error(`  [!] WS error for ${bodyId ?? 'unknown'}:`, err.message)
-  })
-})
+    console.error(`  [!] WS error:`, err.message);
+  });
+});
 
-// ─── Start ──────────────────────────────────────────────────────────────────
+// ─── Startup ────────────────────────────────────────────────────────────────
 
-const PORT = process.env.PORT || 3001
+async function startup() {
+  console.log('╔══════════════════════════════════╗');
+  console.log('║   COSMOS//SERVER v2.0 (GitHub)   ║');
+  console.log(`║   Port: ${PORT}                    ║`);
+  console.log(`║   Repo: ${GITHUB_REPO}   ║`);
+  console.log('╚══════════════════════════════════╝');
+  console.log('');
 
-server.listen(PORT, () => {
-  console.log('╔══════════════════════════════════╗')
-  console.log('║     COSMOS//SERVER v1.0          ║')
-  console.log(`║     Port: ${PORT}                  ║`)
-  console.log('╚══════════════════════════════════╝')
-  console.log('')
-})
+  // Create COSMOS X
+  createCosmosX();
+
+  // Restore planets from storage
+  restorePlanetsFromStorage();
+
+  // Initial sync
+  await syncGitHubStars();
+
+  // Start periodic sync
+  setInterval(syncGitHubStars, SYNC_INTERVAL);
+  console.log(`\n  [GitHub] Sync interval: ${SYNC_INTERVAL / 1000}s`);
+
+  // Start server
+  server.listen(PORT, () => {
+    console.log(`\n  [✓] Server ready on port ${PORT}\n`);
+  });
+}
+
+startup().catch(err => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
