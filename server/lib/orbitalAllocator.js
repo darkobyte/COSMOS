@@ -22,7 +22,7 @@ const COSMOS_ORBIT_MAX = 5999; // soft cap for planet orbits around COSMOS X
 // These directly control how far planets get pushed out.
 const PLANET_COLLISION_BUFFER = 30; // safety margin between planet orbit "bands"
 const PLANET_SPACING_BASE = 55; // base spacing between planets
-const PLANET_SPACING_JITTER = 90; // extra random spacing
+const PLANET_SPACING_JITTER = 35; // extra random spacing (reduced for more predictable progression)
 
 // Co-orbital planets (same orbit radius is allowed if speed matches, so they never drift together)
 const COORBIT_PROB_BASE = 0.18;
@@ -155,29 +155,53 @@ class OrbitalAllocator {
     // Our planet orbit "band" includes its own size and reserved moon radius
     const ourBand = planetSize * 8 + ourMoonReserve + PLANET_COLLISION_BUFFER;
 
-    // Try to place within a bounded radius range first (keeps the system compact)
-    const attempts = 250;
-    for (let a = 0; a < attempts; a++) {
-      // Bias slightly towards inner orbits to avoid pushing everything out
-      const t = Math.random() ** 1.6;
-      const candidate = COSMOS_FIRST_ORBIT_MIN + t * (COSMOS_ORBIT_MAX - COSMOS_FIRST_ORBIT_MIN);
+    // Progressive orbital search: start with inner orbits and gradually expand outward
+    // This ensures planets spawn close to the center first and get pushed outward organically
+    
+    // Calculate how far out we need to search based on existing planet count
+    const planetCount = children.length;
+    
+    // Define progressive search rings - start small and expand based on crowding
+    const baseSearchRadius = COSMOS_FIRST_ORBIT_MAX; // ~220
+    const expansionPerPlanet = 80; // Each additional planet expands search by ~80 units
+    const maxSearchRadius = Math.min(
+      COSMOS_ORBIT_MAX, 
+      baseSearchRadius + (planetCount * expansionPerPlanet)
+    );
+    
+    // Try multiple search zones, starting from innermost
+    const searchZones = Math.min(5, Math.ceil(planetCount / 3) + 1);
+    const zoneSize = (maxSearchRadius - COSMOS_FIRST_ORBIT_MIN) / searchZones;
+    
+    for (let zone = 0; zone < searchZones; zone++) {
+      const zoneStart = COSMOS_FIRST_ORBIT_MIN + (zone * zoneSize);
+      const zoneEnd = Math.min(maxSearchRadius, zoneStart + zoneSize);
+      
+      // Try more attempts in inner zones
+      const attemptsPerZone = Math.max(20, 60 - (zone * 10));
+      
+      for (let a = 0; a < attemptsPerZone; a++) {
+        // Bias towards the inner part of each zone
+        const t = Math.random() ** 1.4;
+        const candidate = zoneStart + t * (zoneEnd - zoneStart);
 
-      let ok = true;
-      for (const child of children) {
-        // Reserve expected moon band for the existing planet (not always the full max)
-        const childCap = this.getMoonCapacity(child.id);
-        const childMoonReserve = Math.min(MOON_ORBIT_MAX, MOON_ORBIT_MIN + childCap * MOON_SPACING_BASE);
-        const childBand = (child.size || 1) * 8 + childMoonReserve + PLANET_COLLISION_BUFFER;
+        let ok = true;
+        for (const child of children) {
+          // Reserve expected moon band for the existing planet (not always the full max)
+          const childCap = this.getMoonCapacity(child.id);
+          const childMoonReserve = Math.min(MOON_ORBIT_MAX, MOON_ORBIT_MIN + childCap * MOON_SPACING_BASE);
+          const childBand = (child.size || 1) * 8 + childMoonReserve + PLANET_COLLISION_BUFFER;
 
-        const minDistance = childBand + ourBand + PLANET_SPACING_BASE;
-        if (Math.abs(candidate - child.orbit_radius) < minDistance) {
-          ok = false;
-          break;
+          const minDistance = childBand + ourBand + PLANET_SPACING_BASE;
+          if (Math.abs(candidate - child.orbit_radius) < minDistance) {
+            ok = false;
+            break;
+          }
         }
-      }
 
-      if (ok) {
-        return candidate;
+        if (ok) {
+          return candidate;
+        }
       }
     }
 

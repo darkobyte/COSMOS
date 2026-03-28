@@ -94,6 +94,150 @@ function createCosmosX() {
   console.log('  [★] COSMOS X initialized at center');
 }
 
+// ─── Solar System (Hidden Easter Egg) ──────────────────────────────────────
+
+function createSolarSystem() {
+  // Only create if not already exists
+  if (bodies.has('sol')) return;
+
+  console.log('  [🌟] Initializing real Solar System...');
+
+  // Create the Sun (Sol) - orbits COSMOS X
+  const allocator = new OrbitalAllocator(bodies);
+  const sunOrbit = allocator.calculateSafeRadius('cosmos_x', 3, 'sol');
+  
+  const sun = {
+    id: 'sol',
+    name: 'Sol',
+    type: 'star', 
+    size: 3,
+    elements: ['fire', 'gas'],
+    orbit_parent_id: 'cosmos_x',
+    orbit_radius: 400,
+    orbit_speed: 0.0008,
+    orbit_angle_start: Math.random() * Math.PI * 2,
+    registered_at: Date.now(),
+    info: 'Our Sun - the real star of the Solar System 🌟',
+    colors: ['#FDB813', '#FF8C00', '#FFD700']
+  };
+
+  bodies.set('sol', { body: sun, ws: null });
+
+  // Real planets in order from Sun
+  const realPlanets = [
+    { 
+      name: 'Mercury', size: 1, elements: ['rock', 'iron'], radius: 45, speed: 0.012, 
+      color: '#8C7853', info: 'Closest to the Sun ☿️', moons: [] 
+    },
+    { 
+      name: 'Venus', size: 1, elements: ['rock', 'gas'], radius: 65, speed: 0.009, 
+      color: '#FFC649', info: 'Hottest planet ♀️', moons: [] 
+    },
+    { 
+      name: 'Earth', size: 2, elements: ['water', 'rock'], radius: 85, speed: 0.007, 
+      color: '#6B93D6', info: 'Our home planet 🌍',
+      moons: [
+        { name: 'Moon', size: 1, radius: 25, speed: 0.025, color: '#C0C0C0', info: 'Earth\'s natural satellite 🌙' }
+      ]
+    },
+    { 
+      name: 'Mars', size: 1, elements: ['rock', 'iron'], radius: 105, speed: 0.005, 
+      color: '#CD5C5C', info: 'The Red Planet ♂️',
+      moons: [
+        { name: 'Phobos', size: 1, radius: 20, speed: 0.035, color: '#8B7355', info: 'Mars\' inner moon' },
+        { name: 'Deimos', size: 1, radius: 35, speed: 0.018, color: '#A0826D', info: 'Mars\' outer moon' }
+      ]
+    },
+    { 
+      name: 'Jupiter', size: 4, elements: ['gas', 'nitrogen'], radius: 150, speed: 0.003, 
+      color: '#D8CA9D', info: 'Largest planet ♃',
+      moons: [
+        { name: 'Io', size: 1, radius: 40, speed: 0.032, color: '#FFD700', info: 'Volcanic moon ⚡' },
+        { name: 'Europa', size: 1, radius: 60, speed: 0.022, color: '#E8D8B8', info: 'Icy ocean moon 🧊' },
+        { name: 'Ganymede', size: 2, radius: 85, speed: 0.015, color: '#B0A080', info: 'Largest moon 🌍' },
+        { name: 'Callisto', size: 2, radius: 110, speed: 0.010, color: '#8B8680', info: 'Ancient surface' }
+      ]
+    },
+    { 
+      name: 'Saturn', size: 3, elements: ['gas', 'ice'], radius: 190, speed: 0.002, 
+      color: '#FAD5A5', info: 'The ringed planet ♄',
+      moons: [
+        { name: 'Mimas', size: 1, radius: 35, speed: 0.028, color: '#FFFACD', info: 'The death star moon' },
+        { name: 'Enceladus', size: 1, radius: 55, speed: 0.019, color: '#F0F8FF', info: 'Icy geysers 🌊' },
+        { name: 'Rhea', size: 1, radius: 75, speed: 0.013, color: '#E0E6FF', info: 'Saturn\'s 2nd largest' },
+        { name: 'Titan', size: 2, radius: 105, speed: 0.008, color: '#FF8C00', info: 'Thick atmosphere 🌫️' },
+        { name: 'Iapetus', size: 1, radius: 130, speed: 0.005, color: '#DCDCDC', info: 'Two-toned moon' }
+      ]
+    },
+    { 
+      name: 'Uranus', size: 2, elements: ['ice', 'gas'], radius: 230, speed: 0.0015, 
+      color: '#4FD0E7', info: 'Ice giant ♅',
+      moons: [
+        { name: 'Ariel', size: 1, radius: 35, speed: 0.025, color: '#B0C4DE', info: 'Bright moon' },
+        { name: 'Umbriel', size: 1, radius: 50, speed: 0.017, color: '#36454F', info: 'Dark moon' },
+        { name: 'Titania', size: 1, radius: 70, speed: 0.011, color: '#C0C0C0', info: 'Largest of Uranus' },
+        { name: 'Oberon', size: 1, radius: 90, speed: 0.008, color: '#8B8B83', info: 'Cratered surface' },
+        { name: 'Miranda', size: 1, radius: 35, speed: 0.026, color: '#696969', info: 'Shattered moon' }
+      ]
+    },
+    { 
+      name: 'Neptune', size: 2, elements: ['ice', 'gas'], radius: 270, speed: 0.001, 
+      color: '#4B70DD', info: 'Farthest planet ♆',
+      moons: [
+        { name: 'Triton', size: 2, radius: 50, speed: 0.020, color: '#E6F3FF', info: 'Retrograde orbit 🌀' },
+        { name: 'Proteus', size: 1, radius: 75, speed: 0.012, color: '#2F4F7F', info: 'Irregular shape' }
+      ]
+    }
+  ];
+
+  // Create each planet and its moons
+  let moonCount = 0;
+  realPlanets.forEach(planetData => {
+    const planet = {
+      id: `sol_${planetData.name.toLowerCase()}`,
+      name: planetData.name,
+      type: 'planet',
+      size: planetData.size,
+      elements: planetData.elements,
+      orbit_parent_id: 'sol',
+      orbit_radius: planetData.radius,
+      orbit_speed: planetData.speed,
+      orbit_angle_start: Math.random() * Math.PI * 2,
+      registered_at: Date.now(),
+      info: planetData.info,
+      colors: [planetData.color, planetData.color, planetData.color]
+    };
+
+    bodies.set(planet.id, { body: planet, ws: null });
+
+    // Create moons for this planet
+    if (planetData.moons && planetData.moons.length > 0) {
+      planetData.moons.forEach((moonData, idx) => {
+        const moon = {
+          id: `sol_${planetData.name.toLowerCase()}_${moonData.name.toLowerCase().replace(/\s+/g, '_')}`,
+          name: moonData.name,
+          type: 'moon',
+          size: moonData.size || 1,
+          elements: ['rock', 'ice'],
+          orbit_parent_id: planet.id,
+          orbit_radius: moonData.radius,
+          orbit_speed: moonData.speed,
+          orbit_angle_start: Math.random() * Math.PI * 2,
+          registered_at: Date.now(),
+          info: moonData.info,
+          colors: [moonData.color, moonData.color, moonData.color]
+        };
+
+        bodies.set(moon.id, { body: moon, ws: null });
+        moonCount++;
+      });
+    }
+  });
+
+  console.log(`  [🪐] Added ${realPlanets.length} real planets to Solar System`);
+  console.log(`  [🌙] Added ${moonCount} moons to solar system`);
+}
+
 // ─── GitHub Sync ────────────────────────────────────────────────────────────
 
 async function syncGitHubStars() {
@@ -362,6 +506,9 @@ async function startup() {
 
   // Create COSMOS X
   createCosmosX();
+
+  // Create our real Solar System (hidden easter egg)
+  createSolarSystem();
 
   // Restore planets from storage
   restorePlanetsFromStorage();
