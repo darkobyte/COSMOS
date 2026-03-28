@@ -64,8 +64,8 @@ Based on your GitHub followers:
 Want to run your own COSMOS server?
 
 ```bash
-git clone https://github.com/DarkObyte/universe.git
-cd universe
+git clone https://github.com/darkobyte/COSMOS.git
+cd COSMOS
 docker-compose up -d
 ```
 
@@ -85,7 +85,7 @@ This starts:
 ## Project Structure
 
 ```
-universe/
+COSMOS/
 ├── frontend/              # Vue.js frontend application
 ├── server/                # WebSocket server with GitHub API
 │   ├── lib/
@@ -101,7 +101,7 @@ universe/
 
 ## How It Works Technically
 
-1. **Server polls GitHub API** every 5 minutes for stargazers
+1. **Server polls GitHub API** every 10 seconds for stargazers
 2. **New stars** trigger automatic planet creation with:
    - Username-based colors and attributes
    - Smart orbital allocation to avoid collisions
@@ -149,20 +149,43 @@ Response:
 
 ---
 
+## Ownership & Usage
+
+This is the original COSMOS project by **Gianluca** (GitHub: [DarkObyte](https://github.com/DarkObyte)).
+
+**Contributions are welcome**, but the code is **not** available to be re-published as your own project.
+
+You may:
+- View the source, open issues, and submit pull requests
+- Fork/clone this repository **only as needed to contribute back**
+
+You may **not**:
+- Copy/re-upload this repository (or substantial parts of it) and present it as your own repo/project
+- Remove attribution or claim authorship of this work
+- Sell, license, or otherwise commercialize this code or derived works without explicit written permission
+
+If you want to use this code beyond the permissions above (e.g., commercial use, redistribution, public re-hosting), please request permission from the maintainer.
+
+---
+
 ## Contributing
 
-1. Fork the repository
+1. Fork the repository (for contribution purposes)
 2. Create your feature branch
 3. Commit your changes
 4. Push to the branch
 5. Open a Pull Request
 
+By submitting a pull request, you agree that your contribution can be used, modified, and distributed as part of this project by the maintainer.
+
 ---
 
 ## License
 
-MIT License - feel free to use and modify!
+**Copyright © Gianluca. All rights reserved.**
+
+No open-source license is granted. The permissions and restrictions are described in the **Ownership & Usage** section above.
 
 ---
 
-Made with ❤️ by [DarkObyte](https://github.com/DarkObyte)
+Made by [DarkObyte](https://github.com/DarkObyte)
