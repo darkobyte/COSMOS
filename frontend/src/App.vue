@@ -872,6 +872,7 @@ onUnmounted(() => {
         <span class="sep">|</span>
         
         <!-- Radio Controls -->
+         <p>RADIO</p>
         <button class="radio-btn" @click="toggleRadio" :title="radioPlaying ? 'Pause Radio' : 'Play Radio'">
           {{ radioPlaying ? '⏸' : '▶' }}
         </button>
