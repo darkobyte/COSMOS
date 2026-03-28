@@ -8,10 +8,12 @@ services:
       - "3001:3001"
     environment:
       GITHUB_REPO: darkobyte/COSMOS
-      SYNC_INTERVAL: "300000"
+      SYNC_INTERVAL: "10000"
+      DEV_MODE: "true"  # Set to "true" to disable GitHub sync (for testing)
+      DEV_POPULATE_COUNT: "50"  # Number of fake planets to generate in dev mode
     restart: unless-stopped
     volumes:
-      - ./server/stargazers.json:/app/stargazers.json
+      - stargazers-data:/app/data
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
@@ -55,3 +57,6 @@ networks:
     driver: bridge
   traefik:
     external: true
+
+volumes:
+  stargazers-data:

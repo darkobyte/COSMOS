@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const STORAGE_FILE = path.join(__dirname, '..', 'stargazers.json');
+const STORAGE_FILE = path.join(__dirname, '..', 'data', 'stargazers.json');
 
 /**
  * Load stargazers from JSON file

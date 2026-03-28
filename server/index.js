@@ -9,7 +9,9 @@ const { loadStargazers, saveStargazers, addStargazer, removeStargazer } = requir
 
 const PORT = process.env.PORT || 3001;
 const GITHUB_REPO = process.env.GITHUB_REPO || 'darkobyte/COSMOS';
-const SYNC_INTERVAL = parseInt(process.env.SYNC_INTERVAL) || 300000; // 5 minutes
+const SYNC_INTERVAL = parseInt(process.env.SYNC_INTERVAL) || 10000; // 10 seconds
+const DEV_MODE = process.env.DEV_MODE === 'true'; // Skip GitHub sync in dev mode
+const DEV_POPULATE_COUNT = parseInt(process.env.DEV_POPULATE_COUNT) || 50; // Number of fake planets to generate
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -174,6 +176,47 @@ function restorePlanetsFromStorage() {
   console.log(`  [Storage] Restored ${stargazersData.stargazers.length} planets`);
 }
 
+// ─── Dev Mode Auto-Populate ─────────────────────────────────────────────────
+
+async function devAutoPopulate() {
+  if (!DEV_MODE) return;
+
+  const existingCount = stargazersData.stargazers.length;
+  if (existingCount >= DEV_POPULATE_COUNT) {
+    console.log(`  [DEV] Skipping auto-populate (${existingCount} planets already exist)`);
+    return;
+  }
+
+  console.log(`  [DEV] Auto-populating to ${DEV_POPULATE_COUNT} planets (currently ${existingCount})...`);
+
+  const names = [
+    'alice', 'bob', 'charlie', 'diana', 'eve', 'frank', 'grace', 'henry',
+    'iris', 'jack', 'kate', 'leo', 'maria', 'noah', 'olivia', 'paul',
+    'quinn', 'ruby', 'sam', 'tina', 'uma', 'victor', 'wendy', 'xander',
+    'yara', 'zack', 'anna', 'ben', 'cara', 'dan', 'ella', 'finn',
+    'gina', 'hugo', 'ivy', 'jake', 'lily', 'max', 'nina', 'owen',
+    'pia', 'rex', 'sara', 'tom', 'una', 'vince', 'willa', 'xena',
+    'york', 'zara', 'ash', 'blair', 'cruz', 'drew', 'ember'
+  ];
+
+  for (let i = 0; i < DEV_POPULATE_COUNT; i++) {
+    const name = names[i % names.length] + (i >= names.length ? i : '');
+    const fakeStargazer = {
+      id: 1000000 + i,
+      login: name,
+      avatar_url: `https://avatars.githubusercontent.com/u/${1000000 + i}?v=4`,
+      html_url: `https://github.com/${name}`
+    };
+
+    const exists = stargazersData.stargazers.find(s => s.github_id === fakeStargazer.id);
+    if (exists) continue;
+
+    await addNewPlanet(fakeStargazer);
+  }
+
+  console.log(`  [DEV] Auto-populate complete! ${stargazersData.stargazers.length} total planets\n`);
+}
+
 // ─── WebSocket Server ───────────────────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
@@ -239,6 +282,9 @@ async function startup() {
   console.log('║   COSMOS//SERVER v2.0 (GitHub)   ║');
   console.log(`║   Port: ${PORT}                    ║`);
   console.log(`║   Repo: ${GITHUB_REPO}   ║`);
+  if (DEV_MODE) {
+    console.log('║   Mode: DEV (No GitHub Sync)     ║');
+  }
   console.log('╚══════════════════════════════════╝');
   console.log('');
 
@@ -248,12 +294,21 @@ async function startup() {
   // Restore planets from storage
   restorePlanetsFromStorage();
 
-  // Initial sync
-  await syncGitHubStars();
+  // Dev mode auto-populate
+  if (DEV_MODE) {
+    await devAutoPopulate();
+  }
 
-  // Start periodic sync
-  setInterval(syncGitHubStars, SYNC_INTERVAL);
-  console.log(`\n  [GitHub] Sync interval: ${SYNC_INTERVAL / 1000}s`);
+  if (!DEV_MODE) {
+    // Initial sync
+    await syncGitHubStars();
+
+    // Start periodic sync
+    setInterval(syncGitHubStars, SYNC_INTERVAL);
+    console.log(`\n  [GitHub] Sync interval: ${SYNC_INTERVAL / 1000}s`);
+  } else {
+    console.log('  [DEV] GitHub sync disabled');
+  }
 
   // Start server
   server.listen(PORT, () => {
