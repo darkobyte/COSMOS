@@ -901,15 +901,36 @@ onUnmounted(() => {
 
     <Transition name="slide">
       <div v-if="infoPanelVisible && selectedBody" class="info-panel">
-        <div class="info-header">
+        <button class="close-btn" @click="closePanel">[X]</button>
+        
+        <!-- GitHub User Avatar Section (if available) -->
+        <div v-if="selectedBody.avatar_url" class="avatar-section">
+          <div class="avatar-frame">
+            <div class="avatar-corner tl"></div>
+            <div class="avatar-corner tr"></div>
+            <div class="avatar-corner bl"></div>
+            <div class="avatar-corner br"></div>
+            <img :src="selectedBody.avatar_url" :alt="selectedBody.name" class="avatar-img" />
+          </div>
+          <div class="user-info">
+            <div class="info-name">{{ selectedBody.name }}</div>
+            <a v-if="selectedBody.github_url" :href="selectedBody.github_url" target="_blank" class="github-profile-link">
+              <span class="link-icon">⬈</span> VIEW PROFILE
+            </a>
+          </div>
+        </div>
+        
+        <!-- Traditional Header (for non-GitHub bodies) -->
+        <div v-else class="info-header">
           <span class="info-char" :style="{ color: getBodyColor(selectedBody) }">
             {{ { star: '★', planet: '●', moon: '○', asteroid: '·', blackhole: '◉' }[selectedBody.type] ?? '●' }}
           </span>
           <span class="info-name">{{ selectedBody.name }}</span>
           <span v-if="selectedBody.online === false" class="offline-badge">OFFLINE</span>
-          <button class="close-btn" @click="closePanel">[X]</button>
         </div>
+        
         <div class="divider">────────────────────</div>
+        
         <div class="info-row"><span class="lbl">TYPE</span><span>{{ selectedBody.type.toUpperCase() }}</span></div>
         <div class="info-row"><span class="lbl">ID</span><span>{{ selectedBody.id }}</span></div>
         <div v-if="selectedBody.orbit_parent_id" class="info-row">
@@ -1044,9 +1065,10 @@ html, body {
 
 .info-panel {
   position: fixed;
-  top: 34px; right: 0;
+  top: 0px; right: 0;
   z-index: 20;
   width: 300px;
+  height: 100vh;
   background: rgba(0,8,0,0.94);
   border-left: 1px solid #00ff4140;
   border-bottom: 1px solid #00ff4140;
@@ -1054,6 +1076,137 @@ html, body {
   font-size: 13px;
 }
 
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #ff1744;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  z-index: 10;
+}
+.close-btn:hover { text-shadow: 0 0 8px #ff1744; }
+
+/* Avatar Section */
+.avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-top: 10px;
+}
+
+.avatar-frame {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  margin-bottom: 16px;
+  background: rgba(0,20,0,0.8);
+  border: 2px solid #00ff4160;
+  box-shadow: 
+    0 0 10px rgba(0,255,65,0.2),
+    inset 0 0 20px rgba(0,0,0,0.8);
+}
+
+.avatar-corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #00ff41;
+  z-index: 2;
+}
+
+.avatar-corner.tl {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+  box-shadow: -1px -1px 4px rgba(0,255,65,0.4);
+}
+
+.avatar-corner.tr {
+  top: -2px;
+  right: -2px;
+  border-left: none;
+  border-bottom: none;
+  box-shadow: 1px -1px 4px rgba(0,255,65,0.4);
+}
+
+.avatar-corner.bl {
+  bottom: -2px;
+  left: -2px;
+  border-right: none;
+  border-top: none;
+  box-shadow: -1px 1px 4px rgba(0,255,65,0.4);
+}
+
+.avatar-corner.br {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+  box-shadow: 1px 1px 4px rgba(0,255,65,0.4);
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: brightness(0.9) contrast(1.1);
+  position: relative;
+}
+
+.avatar-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0,255,65,0.03) 2px,
+    rgba(0,255,65,0.03) 4px
+  );
+  pointer-events: none;
+}
+
+.user-info {
+  text-align: center;
+  width: 100%;
+}
+
+.github-profile-link {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: rgba(0,20,0,0.6);
+  border: 1px solid #00ff4180;
+  color: #00ff41;
+  text-decoration: none;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 6px rgba(0,255,65,0.3);
+}
+
+.github-profile-link:hover {
+  background: rgba(0,40,0,0.8);
+  border-color: #00ff41;
+  text-shadow: 0 0 10px rgba(0,255,65,0.8);
+  box-shadow: 0 0 8px rgba(0,255,65,0.3);
+}
+
+.link-icon {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+/* Traditional Header (for non-GitHub bodies) */
 .info-header {
   display: flex;
   align-items: center;
@@ -1073,17 +1226,6 @@ html, body {
   flex: 1;
   text-shadow: 0 0 8px #00ff4188;
 }
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #ff1744;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-.close-btn:hover { text-shadow: 0 0 8px #ff1744; }
 
 .divider { color: #1a5c1a; margin: 7px 0; }
 
