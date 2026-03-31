@@ -9,8 +9,8 @@
  * 
  * User Assignment:
  * - Each GitHub stargazer is assigned to a solar system
- * - First ~5 users per system become planets orbiting the system's sun
- * - Additional users have 30% chance to become moons orbiting existing planets
+ * - First users per system become planets orbiting the system's sun (max 5 planets)
+ * - Additional users have 30% chance to become moons (max 3 moons per system) orbiting existing planets
  * - Systems are created dynamically as needed
  * 
  * Orbital Hierarchy:

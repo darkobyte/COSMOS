@@ -5,10 +5,22 @@
 
 // System configuration
 const MIN_PLANETS_PER_SYSTEM = 1;
-const MAX_PLANETS_PER_SYSTEM = 8;
-const TARGET_PLANETS_PER_SYSTEM = 5; // Preferred size before creating new system
 
-const MOON_PROBABILITY = 0.30; // 30% chance a planet becomes a moon
+// Hard caps per system
+const MAX_PLANETS_PER_SYSTEM = 5;
+const MAX_MOONS_PER_SYSTEM = 3;
+
+// System creation gating
+// A new system may only be created once ALL existing systems have at least this many planets.
+const MIN_PLANETS_BEFORE_NEW_SYSTEM = 3;
+
+// Assignment behavior
+// 30% chance a user becomes a moon (only when moon slots exist)
+const MOON_PROBABILITY = 0.30;
+// After the "min planets" baseline is met, this is the chance to start a fresh system
+// instead of filling existing systems up to MAX_PLANETS_PER_SYSTEM.
+const NEW_SYSTEM_CREATION_PROBABILITY = 0.35;
+
 const BLACKHOLE_SPAWN_RATE = 0.05; // 5% chance per 10 stargazers
 
 // Sun name pools
@@ -112,30 +124,29 @@ class SolarSystemManager {
   }
 
   /**
-   * Find a suitable system for a new user or create one
+   * A new system may only be created once all existing systems have at least
+   * MIN_PLANETS_BEFORE_NEW_SYSTEM planets.
    */
-  findOrCreateSystem(userId) {
-    // Check existing systems that aren't full
-    for (const [systemId, system] of this.systems) {
-      if (system.planets.length < TARGET_PLANETS_PER_SYSTEM) {
-        return systemId;
-      }
+  canCreateNewSystem() {
+    if (this.systems.size === 0) return true;
+
+    for (const [, system] of this.systems) {
+      if (system.planets.length < MIN_PLANETS_BEFORE_NEW_SYSTEM) return false;
     }
 
-    // All systems are at target capacity, check for systems under max
-    for (const [systemId, system] of this.systems) {
-      if (system.planets.length < MAX_PLANETS_PER_SYSTEM) {
-        return systemId;
-      }
-    }
+    return true;
+  }
 
-    // Create new system
+  /**
+   * Create and register a new solar system
+   */
+  createSystem() {
     const newSystemId = `system_${this.systems.size + 1}`;
     const sun = this.generateSun(newSystemId);
-    
+
     this.systems.set(newSystemId, {
       id: newSystemId,
-      sun: sun,
+      sun,
       planets: [],
       moons: [],
       created_at: Date.now()
@@ -145,33 +156,116 @@ class SolarSystemManager {
   }
 
   /**
-   * Assign a user to a system
+   * Pick an existing system that can accept a new planet.
+   * Returns null if a new system should be created.
    */
-  assignUserToSystem(userId, planetData) {
-    const systemId = this.findOrCreateSystem(userId);
-    const system = this.systems.get(systemId);
+  findSystemForPlanet() {
+    // First: ensure every existing system reaches the baseline before expanding
+    let bestUnderMin = null;
+    let bestUnderMinPlanets = Infinity;
 
-    // Decide if this should be a moon or planet
-    const shouldBeMoon = system.planets.length > 0 && Math.random() < MOON_PROBABILITY;
+    for (const [systemId, system] of this.systems) {
+      if (system.planets.length >= MAX_PLANETS_PER_SYSTEM) continue;
 
-    if (shouldBeMoon) {
-      // Assign as moon to a random planet in the system
-      const randomPlanet = system.planets[Math.floor(Math.random() * system.planets.length)];
-      system.moons.push({
-        userId: userId,
-        parentPlanetId: randomPlanet.userId,
-        planetData: planetData
-      });
-    } else {
-      // Assign as planet
-      system.planets.push({
-        userId: userId,
-        planetData: planetData
-      });
+      if (system.planets.length < MIN_PLANETS_BEFORE_NEW_SYSTEM) {
+        if (system.planets.length < bestUnderMinPlanets) {
+          bestUnderMin = systemId;
+          bestUnderMinPlanets = system.planets.length;
+        }
+      }
     }
 
-    this.userToSystem.set(userId, systemId);
-    return { systemId, isMoon: shouldBeMoon };
+    if (bestUnderMin) return bestUnderMin;
+
+    // Next: choose between filling existing systems or creating a new one
+    const candidates = [];
+    for (const [systemId, system] of this.systems) {
+      if (system.planets.length < MAX_PLANETS_PER_SYSTEM) {
+        candidates.push({ systemId, planets: system.planets.length, moons: system.moons.length });
+      }
+    }
+
+    if (candidates.length === 0) return null;
+
+    if (this.canCreateNewSystem() && Math.random() < NEW_SYSTEM_CREATION_PROBABILITY) {
+      return null;
+    }
+
+    // Balance: pick the system with the fewest planets (then fewest moons)
+    candidates.sort((a, b) => (a.planets - b.planets) || (a.moons - b.moons));
+    return candidates[0].systemId;
+  }
+
+  /**
+   * Pick an existing system that can accept a new moon.
+   */
+  findSystemForMoon() {
+    const candidates = [];
+
+    for (const [systemId, system] of this.systems) {
+      if (system.planets.length === 0) continue;
+      if (system.moons.length >= MAX_MOONS_PER_SYSTEM) continue;
+
+      candidates.push({ systemId, planets: system.planets.length, moons: system.moons.length });
+    }
+
+    if (candidates.length === 0) return null;
+
+    // Prefer systems with fewer moons (spread them out)
+    candidates.sort((a, b) => (a.moons - b.moons) || (b.planets - a.planets));
+    return candidates[0].systemId;
+  }
+
+  /**
+   * Assign a user to a system as either a planet or moon.
+   * Enforces hard caps at mutation time.
+   */
+  assignUserToSystem(userId, planetData) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const moonSystemId = this.findSystemForMoon();
+      const wantsMoon = Math.random() < MOON_PROBABILITY;
+
+      let systemId;
+      let isMoon = false;
+
+      if (wantsMoon && moonSystemId) {
+        systemId = moonSystemId;
+        isMoon = true;
+      } else {
+        const planetSystemId = this.findSystemForPlanet();
+        systemId = planetSystemId || this.createSystem();
+        isMoon = false;
+      }
+
+      const system = this.systems.get(systemId);
+      if (!system) continue;
+
+      if (isMoon) {
+        if (system.planets.length === 0) continue;
+        if (system.moons.length >= MAX_MOONS_PER_SYSTEM) continue;
+
+        const randomPlanet = system.planets[Math.floor(Math.random() * system.planets.length)];
+        system.moons.push({
+          userId,
+          parentPlanetId: randomPlanet.userId,
+          planetData
+        });
+      } else {
+        if (system.planets.length >= MAX_PLANETS_PER_SYSTEM) {
+          continue;
+        }
+
+        system.planets.push({
+          userId,
+          planetData
+        });
+      }
+
+      this.userToSystem.set(userId, systemId);
+      return { systemId, isMoon };
+    }
+
+    throw new Error('Failed to assign user to a system after multiple attempts');
   }
 
   /**
@@ -268,6 +362,13 @@ class SolarSystemManager {
     this.blackholeCounter = state.blackholeCounter || 0;
 
     for (const systemData of state.systems) {
+      if (systemData.planets && systemData.planets.length > MAX_PLANETS_PER_SYSTEM) {
+        console.warn(`  [Systems] Warning: ${systemData.id} has ${systemData.planets.length} planets in storage (max is ${MAX_PLANETS_PER_SYSTEM}).`);
+      }
+      if (systemData.moons && systemData.moons.length > MAX_MOONS_PER_SYSTEM) {
+        console.warn(`  [Systems] Warning: ${systemData.id} has ${systemData.moons.length} moons in storage (max is ${MAX_MOONS_PER_SYSTEM}).`);
+      }
+
       this.systems.set(systemData.id, {
         id: systemData.id,
         sun: systemData.sun,
